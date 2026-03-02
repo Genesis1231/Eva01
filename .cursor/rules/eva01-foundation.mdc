@@ -8,29 +8,20 @@ alwaysApply: true
 EVA01 is a project that aims to create a new AI agent that lives on her own with her own personality, and her own goals. she can interact with the world through her own eyes, and her own skills. she can learn from the world and improve herself.
 
 # EVA01 Foundation Rule
-
-- Discuss before execute: propose options, trade-offs, and order of work first.
 - Keep changes focused: do not refactor unrelated files in the same task.
 - Git safety: do not commit, amend, or push unless explicitly requested.
-- Preserve secrets: never commit private `.env` files; keep only safe templates and approved public config files.
-- Validate important edits with quick checks (lint/tests/run command) when feasible.
-
-## Project Defaults
-
-- EVA run: `python main.py`
-- EVA server (mobile mode): `python server.py`
-- Frontend run: `cd frontend && npm run dev`
-- Tests: `python -m pytest test/`
-- Assume local mobile mode expects backend on `http://localhost:8080`.
+- Preserve secrets: never commit private `.env` files;
+- Validate important edits with quick lint checks when feasible.
 
 ## Working Pattern
-
-- For each feature: plan -> implement small slice -> verify -> summarize next step.
+- For each feature: propose plan -> implement small slice -> verify -> summarize next step.
 - If requirements are ambiguous, ask one focused question before coding.
+- DO NOT rewrite README.md files everytime unless it is requested.
+
+# Test Rule
+- The test should be writen in the test/ directory.
+- The test should be written in the same way as the code.
 
 ## Commit Rule
 - Always commit with a single commit message that is witty and fun to read.
-- DO NOT include "co-author" in the commit message.
-
-# Important Notes
-- DO NOT rewrite README.md files everytime unless it is requested.
+- DO NOT include any co-author in the commit message.

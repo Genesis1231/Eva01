@@ -6,7 +6,6 @@ import secrets
 from queue import Queue
 from typing import Dict, Optional, Callable
 
-from eva.utils.stt.voiceid import VoiceIdentifier
 
 class Transcriber:
     """
@@ -24,12 +23,15 @@ class Transcriber:
         >>> transcription, language = transcriber.transcribe(audioclip)
     """
     
-    def __init__(self, model_name: str = "faster-whisper", language: str = "en"):
+    def __init__(
+        self, 
+        model_name: str = "faster-whisper", 
+        language: str = "en"
+    ) -> None:
         self._model_selection: str = model_name.upper()
         self._model_language: str = language
         
         self.model = self._initialize_model()
-        self.identifier = VoiceIdentifier()
         self.name_queue = Queue()
         
         logger.info(f"Transcriber: {self._model_selection} is ready.")
@@ -100,14 +102,10 @@ class Transcriber:
             content = f": <human_reply>{transcription.strip()}</human_reply> (I couldn't identify the voice.)"
             display = f"User:{transcription}"
         else:
-            name = self.identifier.get_name(identification)
+            name = "Adam"
             content = f"{name} ({identification}):: <human_reply>{transcription.strip()}</human_reply>"
             display = f"{name}:{transcription}"
-        # if name == "unknown person":
-        #     speaker_id = secrets.token_hex(4)
-        #     filepath = os.path.join(os.getcwd(), "data", "voids", f"{speaker_id}.wav")
-        #     self.identifier.save_audio_file(audioclip, filepath)
-        #     content += f" (<speaker_id>{speaker_id}</speaker_id>)"
+  
 
         print(f"({datetime.now().strftime('%H:%M:%S')}) {display}")
         

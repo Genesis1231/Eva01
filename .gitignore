@@ -6,8 +6,12 @@
 .cursorignore
 
 __pycache__/
+.claude/
+.cursor/
 .vscode/
+
 dlib/
+test/
 tests/
 node_modules/
 data/

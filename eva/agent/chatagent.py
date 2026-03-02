@@ -1,4 +1,4 @@
-from app.config import logger
+from config import logger
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
 from datetime import datetime
@@ -50,28 +50,15 @@ class ChatAgent:
         kwargs = {"temperature": 0.8}
         
         # Accommodate local model specifics
-        is_local = base_url and any(host in base_url for host in ["localhost", "127.0.0.1"])
-        is_ollama = "ollama" in model_name
-
-        if is_local or is_ollama:
-            kwargs["base_url"] = base_url
-            kwargs["temperature"] = 0.6
-            
-            if is_ollama:
-                kwargs.update({
-                    "keep_alive": "1h",
-                    "format": "json"
-                })
+        if "ollama" in model_name:
+            kwargs.update({
+                "base_url" : base_url,
+                "keep_alive": "1h",
+                "format": "json"
+            })
 
         try:
             self.llm = init_chat_model(model_name, **kwargs)
-            
-            # Preload local models if needed
-            if is_ollama:
-                try:
-                    self.llm.invoke("")
-                except Exception:
-                    pass
         except Exception as e:
             raise Exception(f"Failed to initialize model '{model_name}': {str(e)}")
             
@@ -147,8 +134,8 @@ class ChatAgent:
         # Ensure our constructor no longer leaves an empty {{tools}} placeholder,
         # or we just format it away.
         prompt_template = PromptTemplate.from_template(prompt)
-
         prompt_value = prompt_template.format(tools="Available via native tool calling bindings.")
+        print(f"prompt is {prompt_value}")
         
         try: 
             if output_format is not None:

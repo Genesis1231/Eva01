@@ -1,6 +1,13 @@
 import os
 from unittest.mock import patch, MagicMock
 
+try:
+    from dotenv import load_dotenv
+    # Load .env from project root
+    load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
+except ImportError:
+    pass
+
 from eva.agent.chatagent import ChatAgent
 
 
@@ -54,7 +61,7 @@ def test_chatagent_openai_real():
 
     agent = ChatAgent(model_name="gpt-4o-mini")
 
-    sense_data = {"user_message": "Say exactly: 'Apple Banana Cherry' in valid JSON."}
+    sense_data = {"user_message": "generate exactly: 'Apple Banana Cherry' with valid JSON format."}
 
     print("Invoking agent...")
     result = agent.respond(sense=sense_data, history=[])
@@ -69,14 +76,7 @@ def test_chatagent_openai_real():
 
 if __name__ == "__main__":
     import sys
-    try:
-        test_chatagent_initialization()
-        test_chatagent_respond()
-        test_chatagent_openai_real()
-        print("\nAll ChatAgent tests passed successfully!")
-    except AssertionError as e:
-        print(f"AssertionError: {e}")
-        sys.exit(1)
-    except Exception as e:
-        print(f"Test failed with error: {e}")
-        sys.exit(1)
+    test_chatagent_initialization()
+    test_chatagent_respond()
+    test_chatagent_openai_real()
+    print("\nAll ChatAgent tests passed successfully!")

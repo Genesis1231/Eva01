@@ -71,9 +71,9 @@ def initialize_modules(config : Dict[str, str]) -> Dict[str, Any]:
     # Load the modules
     modules = load_classes(module_list)
     
-    if client_type == "DESKTOP":
+    if client_type == "local":
         modules["client"].initialize_modules(modules["stt_model"], modules["vision_model"], modules["tts_model"])    
-    elif client_type == "MOBILE":
+    elif client_type == "server":
         modules["client"].initialize_modules(tts_model=modules["tts_model"])
         
     modules["agent"].set_tools(modules["toolbox"].get_tools())
