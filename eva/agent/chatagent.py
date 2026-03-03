@@ -123,39 +123,6 @@ class ChatAgent:
         prompt_template = PromptTemplate.from_template(prompt)
         return prompt_template.format(tools="Available via native tool calling bindings.")
 
-    def respond(
-        self,
-        template: Optional[str] = None,
-        timestamp: Optional[datetime] = None,
-        sense: Optional[Dict] = None,
-        history: Optional[List[Dict]] = None,
-        action_results: Optional[List[Dict]] = None,
-        language: Optional[str] = "english",
-        output_format: Optional[type[BaseModel]] = None,
-    ) -> Dict:
-        """Synchronous response — builds prompt and invokes the LLM."""
-        timestamp = timestamp or datetime.now()
-        sense = sense or {}
-        history = history or []
-        action_results = action_results or []
-
-        prompt_value = self._build_prompt_value(template, timestamp, sense, history, action_results)
-
-        try:
-            if output_format is not None:
-                llm_with_tools = self.llm.with_structured_output(output_format)
-                response = llm_with_tools.invoke(prompt_value)
-                return response.model_dump() if isinstance(response, BaseModel) else response
-
-            respond_tool = RespondToUser.with_language(self.language, language)
-            llm_with_tools = self.llm.bind_tools(getattr(self, "tools", []) + [respond_tool])
-            ai_message = llm_with_tools.invoke(prompt_value)
-            logger.debug(f"Raw AI Message: {ai_message}")
-            return self._format_response(ai_message)
-
-        except Exception as e:
-            raise Exception(f"ChatAgent: Failed to get response from model: {str(e)}")
-
     async def arespond(
         self,
         template: Optional[str] = None,

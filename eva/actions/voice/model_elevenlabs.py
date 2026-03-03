@@ -7,12 +7,13 @@ ElevenLabsSpeaker: ElevenLabs TTS model.
 
 from config import logger
 import os
+import tempfile
 import asyncio
 import secrets
 from typing import Optional
 
 from elevenlabs.client import ElevenLabs
-from elevenlabs import VoiceSettings
+from elevenlabs import VoiceSettings, stream
 from .audio_player import AudioPlayer
     
 class ElevenLabsSpeaker:
@@ -36,14 +37,25 @@ class ElevenLabsSpeaker:
                 optimize_streaming_latency=1,
             )
             
-            # play_generator is blocking; run in thread pool so the event loop stays free
             await asyncio.to_thread(
-                self.audio_player.play_generator, 
-                audio_stream
+                stream, 
+                audio_stream,
             )
+            
+            # If you are running elevenlabs and want to halt talking, 
+            # you have to write the audio stream to files first.
+            
+            # with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+            #     f.write(b"".join(audio_stream))
+            #     temp_path = f.name
+                
+            # await asyncio.to_thread(
+            #     self.audio_player.play_stream, 
+            #     temp_path,
+            # )
 
         except Exception as e:
-            logger.error(f"Error during text to speech synthesis: {e}")
+            logger.error(f"Error during ElevenLabs synthesis: {e}")
             
     async def generate_audio(self, text: str, language: Optional[str], media_folder: str) -> Optional[str]:
         """ Generate mp3 from text using ElevenLabs """
@@ -81,7 +93,7 @@ class ElevenLabsSpeaker:
             return f"audio/{filename}"
         
         except Exception as e:
-            logger.error(f"Error during text to speech synthesis: {e}")
+            logger.error(f"Error during ElevenLabs synthesis: {e}")
             return None
 
     async def stop_playback(self) -> None:

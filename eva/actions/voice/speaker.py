@@ -10,6 +10,9 @@ from config import logger
 from typing import Dict, Callable, Optional
 from pathlib import Path
 
+
+_DATA_PATH = Path(__file__).resolve().parents[3] / 'data' / 'media'
+
 class Speaker:
     """
     The Speaker class is responsible for initializing and managing the text-to-speech models.
@@ -18,16 +21,10 @@ class Speaker:
     Attributes:
         model_selection (str): The selected speaker model name.
         model_factory (dict): A dictionary mapping model names to their corresponding creation methods.
-        model: The initialized speaker model instance.
-    Methods:
-        _initialize_model: Initialize the selected speaker model.
-        _get_model_factory: Get the model factory dictionary.
-        speak: Speak the given text using the selected speaker model.
     """
     
     def __init__(self, speaker_model: str = "kokoro", language: str = "en")-> None:
         self._model: str = speaker_model.upper()
-        self._media_folder: str = self._get_data_path()
         self._language: str = language
         
         self.model = self._initialize_model()
@@ -89,9 +86,7 @@ class Speaker:
         
     async def get_audio(self, text: str) -> str:
         """ Generate audio from text and save it to the media folder """
-        return await self.model.generate_audio(text, self._language, self._media_folder)
+        return await self.model.generate_audio(text, self._language, _DATA_PATH)
     
-    def _get_data_path(self) -> Path:
-        """Return the path to the voice database."""
-        return Path(__file__).resolve().parents[3] / 'data' / 'media'
+
         

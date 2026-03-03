@@ -55,7 +55,10 @@ class EdgeSpeaker:
                 temp_path = f.name
 
             await edge_tts.Communicate(text, voice).save(temp_path)
-            await asyncio.to_thread(self.audio_player.stream, temp_path)
+            await asyncio.to_thread(
+                self.audio_player.play_stream, 
+                temp_path,
+            )
 
         except Exception as e:
             logger.error(f"Error during Edge TTS synthesis: {e}")

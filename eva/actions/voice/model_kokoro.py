@@ -9,10 +9,13 @@ import asyncio
 import os
 import secrets
 from pathlib import Path
+from io import BytesIO
+from pydub import AudioSegment
 from typing import Optional
 
 import sounddevice as sd
 import soundfile as sf
+import numpy as np
 from config import logger
 from kokoro_onnx import Kokoro
 
@@ -31,7 +34,7 @@ _LANG_MAP = {
 class KokoroSpeaker:
     """Local TTS using Kokoro (ONNX)."""
 
-    def __init__(self, voice: str = "af_sarah") -> None:
+    def __init__(self, voice: str = "af_heart") -> None:
         onnx_path = _MODEL_DIR / "kokoro-v1.0.onnx"
         voices_path = _MODEL_DIR / "voices-v1.0.bin"
 
@@ -40,7 +43,7 @@ class KokoroSpeaker:
         
         self.voice = voice
         self.audio_player = AudioPlayer()
-        self._kokoro = Kokoro(str(onnx_path), str(voices_path))
+        self._model = Kokoro(str(onnx_path), str(voices_path))
 
     def _get_language(self, language: Optional[str]) -> str:
         return _LANG_MAP.get(language or "en", "en-us") if language else "en-us"
@@ -48,13 +51,14 @@ class KokoroSpeaker:
     async def eva_speak(self, text: str, language: Optional[str] = None) -> None:
         """Speak the given text using Kokoro TTS."""
         try:
+            phonemes, _ = self.g2p(text)
             samples, sample_rate = await asyncio.to_thread(
-                self._kokoro.create,
-                text,
+                self._model.create,
+                text=text,
                 voice=self.voice,
-                speed=1.0,
-                lang=self._get_language(language),
+                lang="en-us",
             )
+            
             await asyncio.to_thread(
                 self.audio_player.play_pcm,
                 samples,
@@ -70,20 +74,33 @@ class KokoroSpeaker:
     ) -> Optional[str]:
         """Generate wav from text and save to the media folder."""
         
-        filename = f"{secrets.token_hex(16)}.wav"
+        filename = f"{secrets.token_hex(16)}.mp3"
         file_path = os.path.join(media_folder, "audio", filename)
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
         try:
             samples, sample_rate = await asyncio.to_thread(
-                self._kokoro.create,
+                self._model.create,
                 text,
                 voice=self.voice,
                 speed=1.0,
                 lang=self._get_language(language),
             )
-            await asyncio.to_thread(sf.write, file_path, samples, sample_rate)
-            logger.info(f"Audio saved to: {file_path}")
+            
+            segment_data = (np.array(samples) * np.iinfo(np.int16).max).astype(np.int16)
+            audio_segment = AudioSegment(
+                segment_data.tobytes(),    
+                frame_rate=sample_rate,  
+                sample_width=2,   
+                channels=1
+            )
+                                                                                                              
+            await asyncio.to_thread(
+                audio_segment.export, 
+                file_path, 
+                format="mp3"
+            )
+            logger.info(f"Speech saved to: {file_path}")
         
             return f"audio/{filename}"
         

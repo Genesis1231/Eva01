@@ -34,8 +34,9 @@ models:
   stt: "faster-whisper"
 
   # The vocal cords: synthesizing EVA's text responses into speech.
-  # Common providers: "coqui", "elevenlabs", "openai"
-  tts: "elevenlabs"
+  # Common providers: "edge", "elevenlabs", "kokoro"
+  # Recommend: "edge" for free, "elevenlabs" for quality, "kokoro" for local.
+  tts: "edge"
 
   # The subconscious processor: running quietly to summarize memory and context.
   # Common providers: "groq", "llama", "chatgpt", "claude", "deepseek-chat"

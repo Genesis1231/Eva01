@@ -29,14 +29,17 @@ class VoiceActor:
         current_music_task: Tracked so music can be stopped without touching speech.
     """
 
-    def __init__(self, action_buffer: ActionBuffer, speaker: Optional[Speaker] = None):
+    def __init__(self, action_buffer: ActionBuffer):
         self.buffer = action_buffer
-        self.speaker = speaker or Speaker()
+        self.speaker = Speaker()
         self.music_player = AudioPlayer()          # dedicated music channel
+        
+        # Tasks
         self.current_speech_task: Optional[asyncio.Task] = None
         self.current_music_task: Optional[asyncio.Task] = None
-        self._running = False
         self._loop_task: Optional[asyncio.Task] = None
+        
+        self._running = False
 
     async def start_loop(self):
         """Start the voice actor loop."""
@@ -69,12 +72,15 @@ class VoiceActor:
                         logger.info("Voice actor interrupted speech.")
                         
             except asyncio.CancelledError:
+                logger.debug("Voice Actor loop cancelled.")
                 self._running = False
                 if self.current_speech_task and not self.current_speech_task.done():
                     self.current_speech_task.cancel()
                 break
+            
             except Exception as e:
                 logger.error(f"Voice Actor error: {e}")
+    
                 
     async def play_music(self, url: str) -> None:
         """Start/replace background music. Does not interrupt speech."""
