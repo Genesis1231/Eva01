@@ -8,7 +8,7 @@ event loop via asyncio.Queue + loop.call_soon_threadsafe.
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict, Any, List
 
 
 @dataclass
@@ -17,25 +17,30 @@ class SenseEntry:
     type: str               # e.g., "observation", "audio", "user_message"
     content: str
     timestamp: datetime = field(default_factory=datetime.now)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the sense entry to a dictionary."""
+        return {
+            "type": self.type,
+            "content": self.content,
+            "timestamp": self.timestamp,
+        }
 
 
 class SenseBuffer:
     """
-    Thread-safe bridge from sync sense threads to the async LangGraph loop.
-
-    Sync threads call push() freely — it uses call_soon_threadsafe to
-    schedule the enqueue on the running event loop.  LangGraph awaits
-    get() or get_all() to consume events.
+    SenseBuffer class
+    
+    Attributes:
+        _queue: - The queue to store the sense entries.
+        _loop: - The event loop to attach to.
+        _pending: - The list of sense entries buffered before the loop was attached.
     """
 
     def __init__(self) -> None:
         self._queue: asyncio.Queue[SenseEntry] = asyncio.Queue()
         self._loop: Optional[asyncio.AbstractEventLoop] = None
-        self._pending: list[SenseEntry] = []   # entries buffered before loop attach
-
-    # ------------------------------------------------------------------
-    # Startup
-    # ------------------------------------------------------------------
+        self._pending: list[SenseEntry] = []   
 
     def attach_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         """Bind the running event loop.  Called once at startup.
@@ -98,25 +103,26 @@ class SenseBuffer:
         arrival order.  Reads directly from the underlying deque —
         acceptable for tests and diagnostics; do not use in hot paths.
         """
-        pending_dicts = [_entry_to_dict(e) for e in self._pending]
-        queued_dicts = [_entry_to_dict(e) for e in list(self._queue._queue)]  # type: ignore[attr-defined]
+        pending_dicts = [entry.to_dict() for entry in self._pending]
+        queued_dicts = [entry.to_dict() for entry in list(self._queue._queue)]  # type: ignore[attr-defined]
         return pending_dicts + queued_dicts
 
-    def pull_all(self) -> list[dict]:
+    def pull_all(self) -> List[Dict[str, Any]]:
         """Drain and return all queued entries as dicts.
 
         Kept for test compatibility.  In production, prefer the async
         get() / get_all() interface.
         """
-        entries: list[dict] = []
+        
+        entries: List[Dict[str, Any]] = []
         # Drain from pending (pre-loop buffer) first
         for entry in self._pending:
-            entries.append(_entry_to_dict(entry))
+            entries.append(entry.to_dict())  # type: ignore[attr-defined]
         self._pending.clear()
         # Drain from the asyncio queue
         while not self._queue.empty():
             try:
-                entries.append(_entry_to_dict(self._queue.get_nowait()))
+                entries.append(self._queue.get_nowait().to_dict())
             except asyncio.QueueEmpty:
                 break
         return entries
@@ -126,13 +132,3 @@ class SenseBuffer:
         return not self._pending and self._queue.empty()
 
 
-# ------------------------------------------------------------------
-# Internal helpers
-# ------------------------------------------------------------------
-
-def _entry_to_dict(entry: SenseEntry) -> dict:
-    return {
-        "type": entry.type,
-        "content": entry.content,
-        "timestamp": entry.timestamp,
-    }

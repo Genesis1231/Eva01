@@ -21,9 +21,9 @@ from typing import Optional
 import numpy as np
 
 from config import logger
-from eva.senses.audio.mic import Microphone
-from eva.senses.audio.transcriber import Transcriber
-from eva.senses.sense_buffer import SenseBuffer
+from .mic import Microphone
+from .transcriber import Transcriber
+from ..sense_buffer import SenseBuffer
 
 
 class AudioSense:
@@ -117,7 +117,7 @@ class AudioSense:
         old_settings = termios.tcgetattr(fd)
 
         try:
-            tty.setraw(fd)
+            tty.setcbreak(fd)
 
             while not self._stop_event.is_set():
                 if self._await_space_press():
@@ -125,11 +125,11 @@ class AudioSense:
                         logger.error("AudioSense: microphone failed to start")
                         continue
 
-                    print("Recording... release to send ...", end="\r", flush=True)
+                    print("Recording... release to send ...\r")
                     self._await_space_release()
 
                     audio = self._mic.stop_recording()
-                    print("... Press SPACE to talk to EVA ...", end="\r", flush=True)
+                    print("... Press SPACE to talk to EVA ...\r")
 
                     if audio is not None:
                         self._audio_queue.put(audio)

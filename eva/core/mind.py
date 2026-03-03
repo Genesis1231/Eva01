@@ -26,9 +26,9 @@ async def weave(config: dict) -> tuple[SenseBuffer, ActionBuffer, AudioSense, Vo
     loop = asyncio.get_running_loop()
         
     # Shared buffers
+    action_buffer = ActionBuffer()
     sense_buffer = SenseBuffer()
     sense_buffer.attach_loop(loop)
-    action_buffer = ActionBuffer()
 
     # Senses
     transcriber = Transcriber(config["STT_MODEL"], config["LANGUAGE"])
@@ -56,7 +56,6 @@ async def breathe(sense_buffer: SenseBuffer, action_buffer: ActionBuffer, agent:
             sense = ("I heard: " if entry.type == "audio" else "I see: ") + entry.content
             response = await agent.arespond(sense=sense)
             text = response.get("response", "")
-            logger.debug(f"EVA: response — {text}")
             
             if text:
                 await action_buffer.put("speak", text)
@@ -85,7 +84,7 @@ async def wake() -> None:
     finally:
         audio_sense.stop()
         await voice_actor.stop()
-        logger.debug("EVA is going to sleep... Bye for now.")
+        logger.debug("EVA is falling asleep... Bye!")
 
 
 if __name__ == "__main__":
