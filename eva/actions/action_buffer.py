@@ -1,5 +1,8 @@
 """
-ActionBuffer: Outgoing event bus for EVA's actions.
+ActionBuffer — Outgoing event bus for EVA's actions.
+
+Mirrors SenseBuffer but flows in the opposite direction:
+    Brain/Tools  →  ActionBuffer  →  registered handlers (voice, screen, etc.)
 
 Tools push events:       await buffer.put("speak", text)
 Consumers register:      buffer.on("speak", handler)
@@ -9,19 +12,30 @@ Spine runs the loop:     await buffer.start_loop()
 import asyncio
 from collections import defaultdict
 from dataclasses import dataclass, field
-import time
-from typing import Callable, Awaitable, Optional
+from datetime import datetime
+from typing import Callable, Awaitable, Optional, Dict, Any, List
 
 from config import logger
 
 
 @dataclass
 class ActionEvent:
-    """A single action command."""
+    """A single outgoing action command."""
     type: str
     content: Optional[str] = None
-    metadata: dict = field(default_factory=dict)
-    timestamp: float = field(default_factory=time.time)
+    metadata: Optional[Dict[str, Any]] = None
+    timestamp: datetime = field(default_factory=datetime.now)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the action event to a dictionary."""
+        d = {
+            "type": self.type,
+            "content": self.content,
+            "timestamp": self.timestamp,
+        }
+        if self.metadata:
+            d["metadata"] = self.metadata
+        return d
 
 
 # Handler signature: async def handler(event: ActionEvent) -> None
@@ -31,32 +45,53 @@ ActionHandler = Callable[[ActionEvent], Awaitable[None]]
 class ActionBuffer:
     """
     Async event bus — tools push, registered handlers consume.
+
+    Attributes:
+        _queue:    Async queue for action events.
+        _handlers: Map of action type → list of async handler functions.
+        _running:  Whether the dispatch loop is active.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._queue: asyncio.Queue[ActionEvent] = asyncio.Queue()
-        self._handlers: dict[str, list[ActionHandler]] = defaultdict(list)
+        self._handlers: Dict[str, List[ActionHandler]] = defaultdict(list)
         self._running = False
 
+    # ------------------------------------------------------------------
+    # Registration (called at startup by action consumers)
+    # ------------------------------------------------------------------
+
     def on(self, action_type: str, handler: ActionHandler) -> None:
-        """Register a handler for an action type."""
+        """Register an async handler for an action type.
+
+        Multiple handlers per type are supported — all will be called
+        in registration order when an event of that type arrives.
+        """
         self._handlers[action_type].append(handler)
         logger.debug(f"ActionBuffer: registered handler for <{action_type}>")
+
+    # ------------------------------------------------------------------
+    # Producer side (async — called by LangGraph tools)
+    # ------------------------------------------------------------------
 
     async def put(
         self,
         action_type: str,
         content: Optional[str] = None,
-        metadata: Optional[dict] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
-        """Push an action command."""
+        """Push an action event onto the bus."""
         event = ActionEvent(
             type=action_type,
             content=content,
-            metadata=metadata or {},
+            metadata=metadata,
         )
         await self._queue.put(event)
         logger.debug(f"ActionBuffer: put <{action_type}> — {len(str(content).split())} words.")
+
+    # ------------------------------------------------------------------
+    # Dispatch loop (async — runs as a concurrent task in the spine)
+    # ------------------------------------------------------------------
 
     async def start_loop(self) -> None:
         """Dispatch events to registered handlers. Runs forever."""
@@ -66,6 +101,10 @@ class ActionBuffer:
         while self._running:
             try:
                 event = await self._queue.get()
+
+                if not self._running:
+                    break
+
                 handlers = self._handlers.get(event.type)
 
                 if not handlers:
@@ -86,7 +125,13 @@ class ActionBuffer:
     async def stop(self) -> None:
         """Stop the dispatch loop."""
         self._running = False
+        # Unblock the queue.get() so the loop can exit
+        await self._queue.put(ActionEvent(type="_stop"))
+
+    # ------------------------------------------------------------------
+    # Introspection
+    # ------------------------------------------------------------------
 
     def empty(self) -> bool:
-        """Check if the buffer is empty."""
+        """True when the queue is empty."""
         return self._queue.empty()

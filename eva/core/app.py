@@ -15,7 +15,7 @@ from eva.agent.chatagent import ChatAgent
 from eva.core.graph import Brain
 from eva.core.memory import MemoryDB
 from eva.senses import SenseBuffer, AudioSense, CameraSense
-from eva.actions import ActionBuffer, VoiceActor
+from eva.actions import ActionBuffer, VoiceActor, Screen
 from eva.senses.audio.transcriber import Transcriber
 from eva.senses.vision.describer import Describer
 from eva.senses.vision.identifier import Identifier
@@ -45,9 +45,13 @@ async def weave(config: Config, checkpointer: AsyncSqliteSaver = None):
     if camera_sense:
         camera_sense.start(sense_buffer)
 
-    # Actions — create before AudioSense so interrupt-on-speak works
+    # Actions — register handlers on the shared buffer
     speaker = Speaker(config.TTS_MODEL, config.LANGUAGE)
-    voice_actor = VoiceActor(action_buffer, speaker)
+    voice_actor = VoiceActor(speaker)
+    voice_actor.register(action_buffer)
+
+    screen = Screen()
+    screen.register(action_buffer)
 
     # initialize transcriber and audio sense
     transcriber = Transcriber(config.STT_MODEL)
@@ -95,7 +99,7 @@ async def wake() -> None:
         try:
             await asyncio.gather(
                 breathe(sense_buffer, brain),
-                voice_actor.start_loop(),
+                action_buffer.start_loop(),
             )
         except (KeyboardInterrupt, asyncio.CancelledError):
             pass
