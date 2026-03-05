@@ -10,28 +10,33 @@ Context assembly:
 
 import sqlite3
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Optional, List
 
+from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from config import logger
-
-from pathlib import Path
-
-_DB_PATH = Path(__file__).resolve().parents[2] / "data" / "database" / "eva.db"
+from config import logger, DATA_DIR
+from eva.utils.prompt import load_prompt
 
 
 class MemoryDB:
     """EVA's long-term memory — journal and knowledge stores."""
 
-    def __init__(self):
-        _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    def __init__(self, utility_model: str = None):
+        self._init_db()
+        self._journal_prompt = load_prompt("journal")
+        self._pen = init_chat_model(utility_model) if utility_model else None
+        logger.debug(f"MemoryDB: ready (utility_model={'in hand' if self._pen else 'missing'}).")
+
+    def _init_db(self) -> None:
+        (DATA_DIR / "database").mkdir(parents=True, exist_ok=True)
         self._create_tables()
-        logger.debug("MemoryDB: ready.")
+
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(_DB_PATH)
+        db_path = DATA_DIR / "database" / "eva.db"
+        conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
         return conn
 
@@ -53,8 +58,6 @@ class MemoryDB:
                 )
             """)
 
-    # ── Journal ──────────────────────────────────────────────
-
     def add_journal(self, content: str, session_id: str = None) -> str:
         """Write an episode to the journal. Returns the entry id."""
         entry_id = uuid.uuid4().hex[:12]
@@ -65,14 +68,15 @@ class MemoryDB:
                     "INSERT INTO journal (id, content, session_id, created_at) VALUES (?, ?, ?, ?)",
                     (entry_id, content, session_id, now),
                 )
-            logger.debug(f"MemoryDB: journal entry {entry_id} written ({len(content)} chars).")
             return entry_id
+        
         except sqlite3.Error as e:
             logger.error(f"MemoryDB: failed to write journal — {e}")
             return ""
 
     def get_recent_journal(self, limit: int = 10) -> List[str]:
         """Get recent journal entries — today's entries, or last session's if none today."""
+        
         today_start = datetime.now(timezone.utc).replace(
             hour=0, minute=0, second=0, microsecond=0
         ).isoformat()
@@ -202,10 +206,25 @@ class MemoryDB:
 
         return distilled, journal_summary
 
+    @staticmethod
+    def _text_content(content) -> str:
+        """Extract text from message content (str or list of content blocks)."""
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            return " ".join(
+                block.get("text", "") if isinstance(block, dict) else str(block)
+                for block in content
+            ).strip()
+        return str(content)
+
     # ── Flush ────────────────────────────────────────────────
 
-    def flush(self, messages: list, session_id: str = None) -> bool:
-        """Distill a full session into a journal entry. Called on shutdown/recovery."""
+    async def flush(self, messages: list, session_id: str = None) -> bool:
+        """
+        Summarize a full session into a journal entry via the utility LLM.
+        Called on shutdown/recovery to save the session to the journal.
+        """
         if not messages:
             logger.debug("MemoryDB: nothing to flush.")
             return False
@@ -213,19 +232,32 @@ class MemoryDB:
         # Distill entire session (treat all messages as history)
         distilled = self.distill(messages)
 
-        # Build a text summary from distilled messages
+        # Build conversation text from distilled messages
         parts = []
         for msg in distilled:
             if isinstance(msg, HumanMessage):
-                parts.append(f"Sensed: {msg.content}")
+                parts.append(self._text_content(msg.content))
             elif isinstance(msg, AIMessage) and msg.content:
-                parts.append(msg.content)
+                parts.append(self._text_content(msg.content))
 
         if not parts:
             logger.debug("MemoryDB: distilled to nothing, skipping flush.")
             return False
 
-        summary = "\n".join(parts)
-        self.add_journal(summary, session_id=session_id)
-        logger.debug(f"MemoryDB: flushed session → journal ({len(parts)} entries).")
+        conversation = "\n".join(parts)
+
+        # Journal the session via utility LLM, or fall back to raw distilled text
+        if self._pen:
+            try:
+                prompt = self._journal_prompt.replace("{conversation}", conversation)
+                response = await self._pen.ainvoke(prompt)
+                journal = response.content.strip()
+            except Exception as e:
+                logger.error(f"MemoryDB: journaling failed, saving raw — {e}")
+                journal = conversation
+        else:
+            journal = conversation
+
+        self.add_journal(journal, session_id=session_id)
+        logger.debug(f"MemoryDB: journaled session ({len(journal.split())} words).")
         return True

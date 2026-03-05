@@ -1,6 +1,7 @@
 """
 ActionBuffer: Outgoing event bus for EVA's actions. 
   put(action_type, content, metadata) -> None
+    Actions: speak, interrupt
   get() -> ActionEvent
   empty() -> bool
 """
@@ -15,7 +16,7 @@ from typing import Optional
 @dataclass
 class ActionEvent:
     """A single action command."""
-    type: str               # e.g., "speak", "interrupt", "ui"
+    type: str              
     content: Optional[str] = None # the actual data (text to speak, etc.)
     metadata: dict = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)

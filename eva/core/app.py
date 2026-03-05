@@ -7,13 +7,11 @@ Three concurrent components sharing two buffers:
 
 import asyncio
 import uuid
-from pathlib import Path
 
 from dotenv import load_dotenv
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-from config import logger, eva_configuration
-from config.config import Config
+from config import logger, eva_configuration, DATA_DIR, Config
 from eva.agent.chatagent import ChatAgent
 from eva.core.graph import Brain, THREAD_ID
 from eva.core.memory import MemoryDB
@@ -25,10 +23,8 @@ from eva.senses.vision.identifier import Identifier
 from eva.actions.voice.speaker import Speaker
 from eva.core.people import PeopleDB
 
-DB_PATH = "data/database/eva_graph.db"
 
-
-async def weave(config: Config, checkpointer=None):
+async def weave(config: Config, checkpointer: AsyncSqliteSaver = None):
     """Wire up senses, brain, and actions. Return shared buffers and components."""
 
     logger.debug("Weaving EVA's core components...")
@@ -40,7 +36,7 @@ async def weave(config: Config, checkpointer=None):
     sense_buffer.attach_loop(loop)
 
     # Memory
-    memory_db = MemoryDB()
+    memory_db = MemoryDB(config.UTILITY_MODEL)
 
     # initialize vision sense
     describer = Describer(config.VISION_MODEL)
@@ -63,7 +59,6 @@ async def weave(config: Config, checkpointer=None):
     speaker = Speaker(config.TTS_MODEL, config.LANGUAGE)
     voice_actor = VoiceActor(action_buffer, speaker)
 
-    logger.debug("EVA: successfully initialized all components. Now ready to go!")
     return sense_buffer, action_buffer, audio_sense, camera_sense, voice_actor, brain, memory_db
 
 
@@ -92,7 +87,7 @@ async def _recover_checkpointer(brain: Brain, memory_db: MemoryDB, checkpointer)
 
     logger.debug(f"MemoryDB: recovering {len(messages)} residual messages from checkpointer.")
     session_id = f"recovered-{uuid.uuid4().hex[:8]}"
-    memory_db.flush(messages, session_id=session_id)
+    await memory_db.flush(messages, session_id=session_id)
     await _clear_checkpointer(checkpointer)
 
 
@@ -104,7 +99,7 @@ async def _flush_and_clear(brain: Brain, memory_db: MemoryDB, checkpointer) -> N
         return
 
     session_id = f"session-{uuid.uuid4().hex[:8]}"
-    memory_db.flush(messages, session_id=session_id)
+    await memory_db.flush(messages, session_id=session_id)
     await _clear_checkpointer(checkpointer)
 
 
@@ -128,18 +123,22 @@ async def _clear_checkpointer(checkpointer) -> None:
 async def wake() -> None:
     """Launch EVA — senses, mind, and voice running concurrently."""
     load_dotenv()
-    config: Config = eva_configuration
 
     # Ensure DB directory exists
-    Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
+    graph_db = DATA_DIR / "database" / "eva_graph.db"
+    graph_db.parent.mkdir(parents=True, exist_ok=True)
 
     logger.debug("EVA is waking up...")
 
-    async with AsyncSqliteSaver.from_conn_string(DB_PATH) as checkpointer:
-        sense_buffer, action_buffer, audio_sense, camera_sense, voice_actor, brain, memory_db = await weave(config, checkpointer)
+    async with AsyncSqliteSaver.from_conn_string(str(graph_db)) as checkpointer:
+        sense_buffer, action_buffer, audio_sense, camera_sense, voice_actor, brain, memory_db = await weave(eva_configuration, checkpointer)
 
         # Recover any residual messages from a previous crash
         await _recover_checkpointer(brain, memory_db, checkpointer)
+
+        logger.debug("EVA: successfully initialized all components. Now ready to go!")
+        await action_buffer.put("speak", "I am ready!.")
+        print("\n   ... PRESS SPACE to talk to EVA ...")
 
         try:
             await asyncio.gather(

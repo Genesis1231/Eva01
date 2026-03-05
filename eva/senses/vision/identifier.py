@@ -5,7 +5,8 @@ import numpy as np
 from deepface import DeepFace
 
 from config import logger
-from eva.core.people import PeopleDB, FACES_DIR
+from config import DATA_DIR
+from eva.core.people import PeopleDB
 
 
 class Identifier:
@@ -16,7 +17,7 @@ class Identifier:
 
     def __init__(self, people_db: PeopleDB):
         self.people = people_db
-        self._db_path = FACES_DIR
+        self._db_path = DATA_DIR / "faces"
         self._init_model()
 
     def _init_model(self):

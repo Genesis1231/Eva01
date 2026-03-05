@@ -1,13 +1,7 @@
 import sqlite3
 from datetime import datetime, timezone
-from typing import Optional, Dict, List
-from pathlib import Path
-from config import logger
-
-
-_DATA_DIR = Path(__file__).resolve().parents[2] / "data"
-_DB_PATH = _DATA_DIR / "database" / "eva.db"
-_FACES_DIR = _DATA_DIR / "faces"
+from typing import Dict
+from config import logger, DATA_DIR
 
 
 class PeopleDB:
@@ -20,13 +14,14 @@ class PeopleDB:
 
     def _connect(self) -> sqlite3.Connection:
         """Connect to the database."""
-        conn = sqlite3.connect(_DB_PATH)
+        db_path = DATA_DIR / "database" / "eva.db"
+        conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
         return conn
 
     def init_db(self) -> None:
         """Initialize the database."""
-        _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        (DATA_DIR / "database").mkdir(parents=True, exist_ok=True)
         self._create_table()
         self._cache = self._load_all()
  
@@ -70,7 +65,7 @@ class PeopleDB:
             return False
 
         now = datetime.now(timezone.utc).isoformat()
-        face_dir = _FACES_DIR / person_id
+        face_dir = DATA_DIR / "faces" / person_id
         face_dir.mkdir(parents=True, exist_ok=True)
 
         try:

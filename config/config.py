@@ -3,6 +3,7 @@ import yaml
 from pydantic import BaseModel, Field, AliasPath
 
 CONFIG_FILE = Path(__file__).with_name("eva.yaml")
+DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 
 class Config(BaseModel):
     # System settings
@@ -19,7 +20,7 @@ class Config(BaseModel):
     VISION_MODEL: str = Field(validation_alias=AliasPath("models", "vision"))
     STT_MODEL: str = Field(validation_alias=AliasPath("models", "stt"))
     TTS_MODEL: str = Field(validation_alias=AliasPath("models", "tts"))
-    SUMMARIZE_MODEL: str = Field(validation_alias=AliasPath("models", "summarize"))
+    UTILITY_MODEL: str = Field(validation_alias=AliasPath("models", "utility"))
 
     @classmethod
     def load_yaml(cls, path: Path = CONFIG_FILE) -> "Config":

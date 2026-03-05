@@ -116,7 +116,6 @@ class AudioSense:
 
     def _input_loop(self) -> None:
         """Thread: monitors SPACE key, records mic audio, queues it."""
-        print("... Press SPACE to talk to EVA ...")
 
         fd = sys.stdin.fileno()
         old_settings = termios.tcgetattr(fd)
@@ -130,11 +129,11 @@ class AudioSense:
                         logger.error("AudioSense: microphone failed to start")
                         continue
 
-                    print("Recording... release to send ...\r")
+                    print("   ...Recording... RELEASE to send ...\r")
                     self._await_space_release()
 
                     audio = self._mic.stop_recording()
-                    print("... Press SPACE to talk to EVA ...\r")
+                    print("   ... PRESS SPACE to talk to EVA ...\r")
 
                     if audio is not None:
                         self._audio_queue.put(audio)
@@ -160,7 +159,7 @@ class AudioSense:
                     text, _ = result
 
                     buffer.push("audio", text)
-                    logger.debug(f"AudioSense: heard — {text[:80]}")
+                    logger.debug(f"AudioSense: heard — {text}")
                 else:
                     logger.debug("AudioSense: no speech detected")
             except Exception as e:
