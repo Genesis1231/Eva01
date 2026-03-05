@@ -15,6 +15,7 @@ import signal
 import sys
 import termios
 import threading
+import time
 import tty
 from typing import Optional
 
@@ -131,22 +132,28 @@ class AudioSense:
                     # Interrupt EVA if she's speaking
                     if self._voice_actor and self._voice_actor.is_speaking:
                         self._voice_actor.speaker.stop_speaking()
-                        logger.debug("AudioSense: interrupted speech.")
+                        print("   [DBG] interrupted speech\r", flush=True)
+                        
+                        # Wait for speech to actually stop and release device
+                        for _ in range(20):
+                            if not self._voice_actor.is_speaking:
+                                break
+                            time.sleep(0.1)
 
                     if not self._mic.start_recording():
-                        logger.error("AudioSense: microphone failed to start")
+                        print("   [DBG] mic failed to start!\r", flush=True)
                         continue
 
-                    print("   ...Recording... RELEASE to send ...\r")
+                    print("   ...Recording... RELEASE to send ...\r", flush=True)
                     self._await_space_release()
 
                     audio = self._mic.stop_recording()
-                    print("   ... PRESS SPACE to talk to EVA ...\r")
+                    print("   ... PRESS SPACE to talk to EVA ...\r", flush=True)
 
                     if audio is not None:
                         self._audio_queue.put(audio)
                     else:
-                        logger.warning("AudioSense: recording too short or empty")
+                        print("   [DBG] audio was None — too short or empty\r")
 
         except Exception as e:
             logger.error(f"AudioSense: input loop error — {e}")
@@ -165,9 +172,7 @@ class AudioSense:
                 result = self.transcriber.transcribe(audio)
                 if result:
                     text, _ = result
-
                     buffer.push("audio", text)
-                    logger.debug(f"AudioSense: heard — {text}")
                 else:
                     logger.debug("AudioSense: no speech detected")
             except Exception as e:

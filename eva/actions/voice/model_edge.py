@@ -46,19 +46,16 @@ class EdgeSpeaker:
         # Could be extended with language-specific voice mapping
         return self.voice
 
-    async def eva_speak(self, text: str, language: Optional[str] = None) -> None:
-        """Speak the given text using Edge TTS."""
+    def eva_speak(self, text: str, language: Optional[str] = None) -> None:
+        """Speak the given text using Edge TTS. Blocking — run via to_thread."""
         try:
             voice = self._voice_for(language)
 
             with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
                 temp_path = f.name
 
-            await edge_tts.Communicate(text, voice).save(temp_path)
-            await asyncio.to_thread(
-                self.audio_player.play_stream, 
-                temp_path,
-            )
+            asyncio.run(edge_tts.Communicate(text, voice).save(temp_path))
+            self.audio_player.play_stream(temp_path)
 
         except Exception as e:
             logger.error(f"Error during Edge TTS synthesis: {e}")

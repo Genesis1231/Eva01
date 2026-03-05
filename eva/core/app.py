@@ -34,12 +34,12 @@ async def weave(config: Config, checkpointer: AsyncSqliteSaver = None):
     sense_buffer = SenseBuffer()
     sense_buffer.attach_loop(loop)
 
-    # Memory
-    memory_db = MemoryDB(config.UTILITY_MODEL)
+    # People & Memory
+    people_db = PeopleDB()
+    memory_db = MemoryDB(config.UTILITY_MODEL, people_db=people_db)
 
     # initialize vision sense
     describer = Describer(config.VISION_MODEL)
-    people_db = PeopleDB()
     identifier = Identifier(people_db)
     camera_sense = CameraSense(describer, identifier=identifier, source=config.CAMERA_URL)
     if camera_sense:
@@ -70,7 +70,9 @@ async def breathe(sense_buffer: SenseBuffer, brain: Brain) -> None:
 
         try:
             sense = ("I hear: " if entry.type == "audio" else "I see: ") + entry.content
+            print(f"   [DBG] brain invoked with: {sense[:60]}")
             await brain.invoke(sense)
+            print("   [DBG] brain done")
 
         except Exception as e:
             logger.error(f"EVA: brain error — {e}")

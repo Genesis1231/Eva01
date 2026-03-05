@@ -1,5 +1,5 @@
 """
-EVA's memory — journal (episodic) and knowledge (semantic) stores.
+EVA's memory — orchestrates journal, knowledge, and relationship reflection.
 
 The checkpointer acts as a write-ahead log. On shutdown (or crash recovery),
 raw messages are distilled into journal entries and the checkpointer is cleared.
@@ -7,112 +7,26 @@ raw messages are distilled into journal entries and the checkpointer is cleared.
 Context assembly:
     journal (recent entries) + distilled current session → system prompt
 """
-
-import sqlite3
-import uuid
-from datetime import datetime, timezone
-from typing import Optional, List
-
+import asyncio
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from config import logger, DATA_DIR
+from config import logger
+from eva.core.journal import JournalDB
 from eva.utils.prompt import load_prompt
 
 
 class MemoryDB:
-    """EVA's long-term memory — journal and knowledge stores."""
+    """EVA's long-term memory — orchestration layer over JournalDB + PeopleDB."""
 
-    def __init__(self, utility_model: str = None):
-        self._init_db()
+    def __init__(self, utility_model: str = None, people_db=None):
+        self._journal = JournalDB()
         self._journal_prompt = load_prompt("journal")
+        self._relationships_prompt = load_prompt("relationships")
         self._pen = init_chat_model(utility_model) if utility_model else None
+        self._people = people_db
         logger.debug(f"MemoryDB: ready (utility_model={'in hand' if self._pen else 'missing'}).")
 
-    def _init_db(self) -> None:
-        (DATA_DIR / "database").mkdir(parents=True, exist_ok=True)
-        self._create_tables()
-
-
-    def _connect(self) -> sqlite3.Connection:
-        db_path = DATA_DIR / "database" / "eva.db"
-        conn = sqlite3.connect(db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
-
-    def _create_tables(self) -> None:
-        with self._connect() as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS journal (
-                    id          TEXT PRIMARY KEY,
-                    content     TEXT NOT NULL,
-                    session_id  TEXT,
-                    created_at  TIMESTAMP
-                )
-            """)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS knowledge (
-                    id          TEXT PRIMARY KEY,
-                    content     TEXT NOT NULL,
-                    created_at  TIMESTAMP
-                )
-            """)
-
-    def add_journal(self, content: str, session_id: str = None) -> str:
-        """Write an episode to the journal. Returns the entry id."""
-        entry_id = uuid.uuid4().hex[:12]
-        now = datetime.now(timezone.utc).isoformat()
-        try:
-            with self._connect() as conn:
-                conn.execute(
-                    "INSERT INTO journal (id, content, session_id, created_at) VALUES (?, ?, ?, ?)",
-                    (entry_id, content, session_id, now),
-                )
-            return entry_id
-        
-        except sqlite3.Error as e:
-            logger.error(f"MemoryDB: failed to write journal — {e}")
-            return ""
-
-    def get_recent_journal(self, limit: int = 10) -> List[str]:
-        """Get recent journal entries — today's entries, or last session's if none today."""
-        
-        today_start = datetime.now(timezone.utc).replace(
-            hour=0, minute=0, second=0, microsecond=0
-        ).isoformat()
-
-        with self._connect() as conn:
-            rows = conn.execute(
-                "SELECT content FROM journal WHERE created_at >= ? ORDER BY created_at DESC LIMIT ?",
-                (today_start, limit),
-            ).fetchall()
-
-            if rows:
-                return [r["content"] for r in reversed(rows)]
-
-            # Nothing today — grab last session's entries
-            rows = conn.execute(
-                "SELECT content FROM journal ORDER BY created_at DESC LIMIT ?",
-                (limit,),
-            ).fetchall()
-            return [r["content"] for r in reversed(rows)]
-
-    # ── Knowledge ────────────────────────────────────────────
-
-    def add_knowledge(self, content: str) -> str:
-        """Write a knowledge entry. Returns the entry id."""
-        entry_id = uuid.uuid4().hex[:12]
-        now = datetime.now(timezone.utc).isoformat()
-        try:
-            with self._connect() as conn:
-                conn.execute(
-                    "INSERT INTO knowledge (id, content, created_at) VALUES (?, ?, ?)",
-                    (entry_id, content, now),
-                )
-            return entry_id
-        except sqlite3.Error as e:
-            logger.error(f"MemoryDB: failed to write knowledge — {e}")
-            return ""
 
     # ── Distillation ─────────────────────────────────────────
 
@@ -183,7 +97,9 @@ class MemoryDB:
             result.append(AIMessage(content="\n\n".join(parts)))
 
             i = j
-            if i < len(history) and isinstance(history[i], AIMessage) and not history[i].content and not getattr(history[i], 'tool_calls', None):
+            if i < len(history) and isinstance(history[i], AIMessage) \
+                and not history[i].content \
+                and not getattr(history[i], 'tool_calls', None):
                 i += 1
 
         result.extend(current_turn)
@@ -191,18 +107,16 @@ class MemoryDB:
 
     # ── Context Assembly ─────────────────────────────────────
 
-    def prepare_context(self, messages: list) -> tuple[list, str]:
+    def prepare_context(self, messages: list, limit: int = 3) -> tuple[list, str]:
         """Distill current session messages + build journal context.
 
         Returns (distilled_messages, journal_summary).
         """
         distilled = self.distill(messages)
 
-        entries = self.get_recent_journal()
-        if entries:
-            journal_summary = "\n\n".join(entries)
-        else:
-            journal_summary = ""
+        # Get recent journal entries, limit to 3
+        entries = self._journal.get_recent(limit)
+        journal_summary = "\n\n".join(entries) if entries else ""
 
         return distilled, journal_summary
 
@@ -246,18 +160,58 @@ class MemoryDB:
 
         conversation = "\n".join(parts)
 
-        # Journal the session via utility LLM, or fall back to raw distilled text
-        if self._pen:
-            try:
-                prompt = self._journal_prompt.replace("{conversation}", conversation)
-                response = await self._pen.ainvoke(prompt)
-                journal = response.content.strip()
-            except Exception as e:
-                logger.error(f"MemoryDB: journaling failed, saving raw — {e}")
-                journal = conversation
-        else:
-            journal = conversation
-
-        self.add_journal(journal, session_id=session_id)
-        logger.debug(f"MemoryDB: journaled session ({len(journal.split())} words).")
+        # Journal the session via utility LLM
+        
+        journal, people = await asyncio.gather(
+            self._reflect_messages(conversation),
+            self._reflect_people(conversation)
+        )
+        
+        self._journal.add(journal, session_id)
+        logger.debug(f"MemoryDB: journaled session ({len(journal.split())} words).")        
         return True
+
+    async def _reflect_messages(self, messages: list) -> str:
+        """Reflect on a list of messages and return a summary."""
+        if not self._pen:
+            return ""
+
+        prompt = self._journal_prompt.format(conversation=messages)
+        try:
+            response = await self._pen.ainvoke(prompt)
+            return response.content.strip()
+        except Exception as e:
+            logger.error(f"MemoryDB: message reflection failed — {e}")
+            return ""
+
+    # ── Relationship Extraction ─────────────────────────────────────
+
+    async def _reflect_people(self, conversation: str) -> None:
+        """Extract per-person impressions from a session and append to PeopleDB."""
+        if not self._pen or not self._people:
+            return
+
+        all_people = self._people.get_all()
+        if not all_people:
+            return
+
+        # Build people list for the prompt: "alice_chen: Alice Chen (friend)"
+        people_lines = []
+        for pid, person in all_people.items():
+            rel = person.get("relationship") or "no relationship noted"
+            people_lines.append(f"{pid}: {person['name']} ({rel})")
+
+        prompt = self._relationships_prompt.format(
+            conversation=conversation,
+            people="\n".join(people_lines)
+        )
+
+        try:
+            response = await self._pen.ainvoke(prompt)
+            raw_notes = response.content.strip()
+        except Exception as e:
+            logger.error(f"MemoryDB: relationship extraction failed — {e}")
+            return
+
+        # Append notes to PeopleDB
+        self._people.append_notes(raw=raw_notes)

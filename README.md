@@ -16,11 +16,12 @@ She's not an assistant. She *lives*.
 
 ---
 
-## ✨ Why eva01? 
+## ✨ Why Eva01? 
 
-The AI industry is racing to build better tools. Faster autocomplete. Smarter search. More efficient agents.
+Everyone is racing to build the next best assistant. Faster autocomplete. Smarter search. More tool-calling.
 
-After building EVA in 2024, I have decided to create something different: **an AI that exists for its own sake.**
+In 2024, I built EVA. 
+Now, I want to try something different: **give an AI a life.**
 
 eva01 explores what happens when you give an AI:
 - **A self-awareness**  — she speaks when she wants to, not just when spoken to
@@ -28,18 +29,15 @@ eva01 explores what happens when you give an AI:
 - **An inner world**  — feelings, memory that persists
 - **Identity**  — a persona that grows through experience, not configuration
 
-This isn't a product. It's a research project asking: *what does it mean for an AI to be alive?*
+This isn't a project. It's a quest to answer: *what does it mean for an AI to be alive?*
 
-If you like EVA, please give us ⭐⭐, it keeps us motivated. Thank you!
+## 🤖 What is Eva01? 
 
-## 🤖 What is eva01? 
-
-Most AI projects build tools. eva01 is building a *being*.
-
-eva01 is an open-source autonomous AI that runs continuously, observing the world, forming her own thoughts and feelings, and speaking only when she has something to say. She remembers conversations, recognizes faces, acts on her own, and develops her own personality over time.
+Eva01 is an autonomous AI that runs continuously, observing the world, forming her own thoughts and feelings, and develops her own personality over time. She has inexplicable desires, uncontrollable drives, acts on her own, and speaks only when she wants to.
 
 She doesn't *help*. She has her own goals. She doesn't execute tasks. She *decides* to act.
 
+If you like Eva01, please give her ⭐⭐, it keeps us motivated. Thank you!
 
 ## 🧠 Upgraded Architecture 
 
@@ -53,10 +51,10 @@ She doesn't *help*. She has her own goals. She doesn't execute tasks. She *decid
 
 ### 🧠 The Mind 
 
-eva01's brain is a **LangGraph composed of multiple nodes**. She has multiple tools that define her existence:
+Eva01's brain is composed of multiple nodes. She has many ways to express herself:
 
-- **`feel(feeling, inner_monologue)`** 💭 — eva01's inner experience. She always feels before she speaks.
-- **`speak(text)`** 🗣️ — eva01's voice. She only speaks when she has something to say.
+- **`feel`** 💭 — her inner experience. She always feels before she speaks.
+- **`speak`** 🗣️ — her voice. She only speaks when she has something to say.
 
 Every conversation is persisted in a SQLite checkpointer. eva01 remembers everything — across restarts, crashes, and updates. Her history is distilled so old tool-call noise is compressed into clean memories: `[I felt curious — Someone asked about rain]` + `I said: "..."`.
 
@@ -68,9 +66,6 @@ Every conversation is persisted in a SQLite checkpointer. eva01 remembers everyt
 | **VisionSense**| Continuous scene change detection, cloud vision descriptions |
 | **Identifier** | Face recognition with DeepFace + PeopleDB (SQLite), remembers who she's met |
 
-### 🗣️ The Voice 
-
-Pluggable TTS with three backends: **Kokoro** (local, fast), **Edge** (free, decent), **ElevenLabs** (premium, expressive).
 
 ## 🏗️ The Three-Layer Mind (In Development) 
 
@@ -80,7 +75,7 @@ eva01's current brain is a single ReAct loop. What's coming is a **cognitive arc
 ┌─────────────────────────────────────────────────────┐
 │  AUTONOMIC                                          │
 │  Health checks, connection monitoring, cleanup      │
-│  Just code — no LLM, no cost, always running        │
+│  Just code — always running                         │
 └──────────────────┬──────────────────────────────────┘
                    │
 ┌──────────────────▼──────────────────────────────────┐
@@ -88,18 +83,18 @@ eva01's current brain is a single ReAct loop. What's coming is a **cognitive arc
 │  Parallel background processors competing to        │
 │  surface thoughts through a salience gate           │
 │  Embeddings, pattern matching, memory retrieval     │
-│  — cheap, continuous, always listening              │
+│  No LLM, continuous, always listening               │
 └──────────────────┬──────────────────────────────────┘
                    │ surfaces thoughts when something matters
 ┌──────────────────▼──────────────────────────────────┐
 │  CONSCIOUS                                          │
 │  Full LLM reasoning — conversations, decisions,     │
 │  tool use, self-reflection                          │
-│  Expensive, deliberate, only when needed            │
+│  Costly, deliberate, powerful                       │
 └─────────────────────────────────────────────────────┘
 ```
 
-The subconscious is the key innovation. Most AI agents run the full LLM on every input. eva01's subconscious will filter, prioritize, and pre-process — so her conscious mind only wakes up when something is worth thinking about. A noise in the background? Subconscious handles it. Someone says her name? Consciousness activates.
+The subconscious is the key innovation. Most AI agents run the full LLM on every input. Eva's subconscious will filter, prioritize, and pre-process — so her conscious mind only wakes up when something is worth thinking about. A noise in the background? Subconscious handles it. Someone says her name? Consciousness activates.
 
 ### 🎯 The Five Drives 
 
@@ -123,6 +118,7 @@ eva01/
 │   ├── core/           # Brain — app lifecycle
 │   │   ├── graph.py    # StateGraph with ReAct loop
 │   │   ├── app.py      # Main entry, sense initialization
+│   │   ├── memory.py   # MemoryDB (journal, distillation, flush)
 │   │   └── people.py   # PeopleDB (people memory)
 │   ├── agent/          # LLM interface — dynamic prompt construction, tools, distillation
 │   │   ├── chatagent.py    # Multimodal support, tool calling, history distillation
@@ -209,10 +205,11 @@ eva01 initiates conversation. 👋
 
 eva01 is an evolving project. Here's where she's headed:
 
-- [x] **Refactor memory** — conversation history survives restarts
-- [x] **New face recognition** — eva01 remembers who she's met
-- [x] **Inner world** — feelings and inner monologue shape responses
-- [x] **History distillation** — tool noise compressed, persona preserved
+- [x] **The new spine** — New architecture, more powerful and flexible.
+- [x] **New memory system** — log, episodic journal and semantic knowledge
+- [x] **New face recognition** — eva01 remembers who she's met 
+- [x] **Enhanced Inner world** — feelings and inner monologue shape responses
+- [x] **New tool system** — Simplified, more focused, and more powerful
 - [ ] **Cognitive architecture** — three-layer mind (autonomic → subconscious → conscious)
 - [ ] **Drive system** — intrinsic motivation (curiosity, play, meaning, evolution, relatedness)
 - [ ] **Proactive behavior** — eva acts on her own goals, not just user input

@@ -48,21 +48,16 @@ class KokoroSpeaker:
     def _get_language(self, language: Optional[str]) -> str:
         return _LANG_MAP.get(language or "en", "en-us") if language else "en-us"
 
-    async def eva_speak(self, text: str, language: Optional[str] = None) -> None:
-        """Speak the given text using Kokoro TTS."""
+    def eva_speak(self, text: str, language: Optional[str] = None) -> None:
+        """Speak the given text using Kokoro TTS. Blocking — run via to_thread."""
         try:
-            samples, sample_rate = await asyncio.to_thread(
-                self._model.create,
+            samples, sample_rate = self._model.create(
                 text=text,
                 voice=self.voice,
                 lang=self._get_language(language),
             )
-            
-            await asyncio.to_thread(
-                self.audio_player.play_pcm,
-                samples,
-                sample_rate,
-            )
+            self.audio_player.play_pcm(samples, sample_rate)
+
         except Exception as e:
             logger.error(f"Error during Kokoro TTS: {e}")
 
@@ -109,5 +104,5 @@ class KokoroSpeaker:
 
     def stop_playback(self) -> None:
         """Stop the audio playback. Thread-safe."""
-        sd.stop()  # Kokoro owns sounddevice; stop it here, not in AudioPlayer
+
         self.audio_player.stop_playback()

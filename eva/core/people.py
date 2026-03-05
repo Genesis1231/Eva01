@@ -1,6 +1,6 @@
 import sqlite3
 from datetime import datetime, timezone
-from typing import Dict
+from typing import Dict, List
 from config import logger, DATA_DIR
 
 
@@ -95,13 +95,51 @@ class PeopleDB:
         except sqlite3.Error as e:
             logger.error(f"PeopleDB: Failed to touch {person_id} — {e}")
 
-    def update_notes(self, person_id: str, notes: str) -> None:
-        """EVA writes her impressions."""
+
+    def append_notes(
+        self,
+        person_id: str = None,
+        impression: str = None,
+        *,
+        raw: str = None,
+    ) -> None:
+        """
+        Append impressions of people. 
+        Single: (person_id, impression). 
+        Multi-line: (raw=...) with 'id: impression' lines.
+        """
+        timestamp = datetime.now(timezone.utc).strftime("%B %d, %Y")
+        updates: List[tuple] = []
+
+        if raw:
+            all_people = self.get_all()
+            for line in raw.splitlines():
+                line = line.strip()
+                if not line or ":" not in line:
+                    continue
+                pid, _, imp = line.partition(":")
+                pid, imp = pid.strip(), imp.strip()
+                if pid in all_people and imp:
+                    updates.append((pid, imp))
+        
+        elif person_id and impression:
+            if person_id in self._cache:
+                updates.append((person_id, impression.strip()))
+
+        if not updates:
+            return
+
         try:
             with self._connect() as conn:
-                conn.execute("UPDATE people SET notes = ? WHERE id = ?", (notes, person_id))
-            if person_id in self._cache:
-                self._cache[person_id]["notes"] = notes
+                for pid, imp in updates:
+                    entry = f"## {timestamp}\n\n{imp}\n\n"
+                    existing = self._cache.get(pid, {}).get("notes") or ""
+                    updated = f"{existing}\n\n{entry}".strip() if existing else entry
+                    conn.execute("UPDATE people SET notes = ? WHERE id = ?", (updated, pid))
+                    if pid in self._cache:
+                        self._cache[pid]["notes"] = updated
+            for pid, _ in updates:
+                logger.debug(f"PeopleDB: noted impression for {pid}.")
         except sqlite3.Error as e:
-            logger.error(f"PeopleDB: Failed to update notes for {person_id} — {e}")
+            logger.error(f"PeopleDB: Failed to update notes — {e}")
 

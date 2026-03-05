@@ -57,22 +57,25 @@ class Identifier:
         results = []
         for df in dfs:
             if df.empty:
+                # Face detected but no match — a stranger
+                results.append({"id": None, "name": "someone I don't recognize", "distance": None})
                 continue
 
             # Get the best match (first row)
             match = df.iloc[0]
             identity_path = Path(match["identity"])
-            
+
             # The person_id is the parent directory name
             # Structure: data/faces/{person_id}/image.jpg
             person_id = identity_path.parent.name
-            
+
             name = self.people.get_name(person_id)
             if not name:
+                results.append({"id": None, "name": "someone I don't recognize", "distance": None})
                 continue
 
             self.people.touch(person_id)
-            
+
             results.append({
                 "id": person_id,
                 "name": name,

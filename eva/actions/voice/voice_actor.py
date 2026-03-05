@@ -75,10 +75,10 @@ class VoiceActor:
 
         language = command.metadata.get("language", "en")
         self.is_speaking = True
-        
-        # Create new speech task
+
+        # Run blocking speak in a thread so the event loop stays free
         self.current_speech_task = asyncio.create_task(
-            self.speaker.speak(command.content, language)
+            asyncio.to_thread(self.speaker.speak, command.content, language)
         )
         self.current_speech_task.add_done_callback(
             lambda _: setattr(self, 'is_speaking', False)
@@ -93,8 +93,13 @@ class VoiceActor:
     async def _cancel_speech(self):
         """Cancel current speech task and stop speaker output."""
         if self.current_speech_task and not self.current_speech_task.done():
-            self.current_speech_task.cancel()
-        self.speaker.stop_speaking()
+            self.speaker.stop_speaking()       # unblock sd.wait() / mpv
+            try:
+                await self.current_speech_task  # wait for thread to actually finish
+            except Exception:
+                pass
+        self.current_speech_task = None
+        self.is_speaking = False
                 
     async def play_music(self, url: str) -> None:
         """Start/replace background music. Does not interrupt speech."""

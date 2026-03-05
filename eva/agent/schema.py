@@ -5,7 +5,7 @@ from functools import lru_cache
 
 class RespondToUser(BaseModel):
     """How I think and speak. I always use this to express myself."""
-    feeling: str = Field(description="What I feel right now.", max_length=50)
+    feeling: str = Field(description="What I feel right now.", max_length=20)
     inner_monologue: str = Field(description="What I notice and think about this, in my own words.")
     response: str = Field(description="What I say out loud.")
 

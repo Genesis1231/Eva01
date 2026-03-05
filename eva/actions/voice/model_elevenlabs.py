@@ -24,8 +24,8 @@ class ElevenLabsSpeaker:
         self.audio_player: AudioPlayer = AudioPlayer()
         self.voice: str = voice # voice could be configured in the future
         
-    async def eva_speak(self, text: str, language: Optional[str] = None) -> None:
-        """Speak the given text using ElevenLabs."""
+    def eva_speak(self, text: str, language: Optional[str] = None) -> None:
+        """Speak the given text using ElevenLabs. Blocking — run via to_thread."""
         model_name = "eleven_flash_v2" if language == "en" else "eleven_v3"
 
         try:
@@ -36,23 +36,7 @@ class ElevenLabsSpeaker:
                 voice_id=self.voice,
                 optimize_streaming_latency=1,
             )
-            
-            await asyncio.to_thread(
-                stream, 
-                audio_stream,
-            )
-            
-            # If you are running elevenlabs and want to halt talking, 
-            # you have to write the audio stream to files first.
-            
-            # with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
-            #     f.write(b"".join(audio_stream))
-            #     temp_path = f.name
-                
-            # await asyncio.to_thread(
-            #     self.audio_player.play_stream, 
-            #     temp_path,
-            # )
+            stream(audio_stream)
 
         except Exception as e:
             logger.error(f"Error during ElevenLabs synthesis: {e}")

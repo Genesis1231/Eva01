@@ -72,12 +72,12 @@ class Speaker:
         """ Stop the speaker model. Thread-safe. """
         self.model.stop_playback()
         
-    async def speak(self, answer: str, language: Optional[str] = "en"):
-        """ Speak the given text using the selected speaker model """
+    def speak(self, answer: str, language: Optional[str] = "en"):
+        """ Speak the given text. Blocking — run via to_thread. """
         try:
             print(f"\n({datetime.now().strftime('%H:%M:%S')}) EVA: {answer}")
-            await self.model.eva_speak(answer, language)
-            
+            self.model.eva_speak(answer, language)
+
         except Exception as e:
             raise Exception(f"Error: Failed to speak {str(e)} ")
         

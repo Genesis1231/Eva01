@@ -15,7 +15,6 @@ from langgraph.prebuilt import ToolNode
 from eva.agent.chatagent import ChatAgent
 
 
-
 class Brain:
     """EVA's brain graph — topology only, agent owns the process."""
 
