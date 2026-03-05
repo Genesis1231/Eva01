@@ -12,6 +12,7 @@ from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from config import logger
+from eva.agent.schema import PeopleReflection
 from eva.core.journal import JournalDB
 from eva.utils.prompt import load_prompt
 
@@ -161,28 +162,27 @@ class MemoryDB:
         conversation = "\n".join(parts)
 
         # Journal the session via utility LLM
-        
-        journal, people = await asyncio.gather(
+        journal, _ = await asyncio.gather(
             self._reflect_messages(conversation),
             self._reflect_people(conversation)
         )
-        
+
         self._journal.add(journal, session_id)
-        logger.debug(f"MemoryDB: journaled session ({len(journal.split())} words).")        
+        logger.debug(f"MemoryDB: journaled session ({len(journal.split())} words).")
         return True
 
-    async def _reflect_messages(self, messages: list) -> str:
-        """Reflect on a list of messages and return a summary."""
+    async def _reflect_messages(self, conversation: str) -> str:
+        """Reflect on a conversation and return a journal entry."""
         if not self._pen:
-            return ""
+            return conversation
 
-        prompt = self._journal_prompt.format(conversation=messages)
+        prompt = self._journal_prompt.replace("{conversation}", conversation)
         try:
             response = await self._pen.ainvoke(prompt)
             return response.content.strip()
         except Exception as e:
             logger.error(f"MemoryDB: message reflection failed — {e}")
-            return ""
+            return conversation
 
     # ── Relationship Extraction ─────────────────────────────────────
 
@@ -195,23 +195,36 @@ class MemoryDB:
         if not all_people:
             return
 
-        # Build people list for the prompt: "alice_chen: Alice Chen (friend)"
+        # Only send people actually mentioned in the conversation
+        conv_lower = conversation.lower()
+        mentioned = {
+            pid: p for pid, p in all_people.items()
+            if p["name"].lower() in conv_lower
+            or p["name"].split()[0].lower() in conv_lower.split()
+        }
+        if not mentioned:
+            return
+
+        # Build people list for the prompt
         people_lines = []
-        for pid, person in all_people.items():
+        for pid, person in mentioned.items():
             rel = person.get("relationship") or "no relationship noted"
             people_lines.append(f"{pid}: {person['name']} ({rel})")
 
-        prompt = self._relationships_prompt.format(
-            conversation=conversation,
-            people="\n".join(people_lines)
+        prompt = self._relationships_prompt.replace(
+            "{conversation}", conversation
+        ).replace(
+            "{people}", "\n".join(people_lines)
         )
 
         try:
-            response = await self._pen.ainvoke(prompt)
-            raw_notes = response.content.strip()
+            structured_pen = self._pen.with_structured_output(PeopleReflection)
+            reflection = await structured_pen.ainvoke(prompt)
         except Exception as e:
             logger.error(f"MemoryDB: relationship extraction failed — {e}")
             return
 
-        # Append notes to PeopleDB
-        self._people.append_notes(raw=raw_notes)
+        # Write validated impressions to PeopleDB
+        for entry in reflection.impressions:
+            if entry.person_id in mentioned:
+                self._people.append_notes(entry.person_id, entry.impression)

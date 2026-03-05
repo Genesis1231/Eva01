@@ -9,6 +9,16 @@ class RespondToUser(BaseModel):
     inner_monologue: str = Field(description="What I notice and think about this, in my own words.")
     response: str = Field(description="What I say out loud.")
 
+class PersonImpression(BaseModel):
+    """A single impression of a person from a conversation."""
+    person_id: str = Field(description="The person's id from the provided list.")
+    impression: str = Field(description="What I noticed about them — mood, what they cared about, anything that struck me. One or two sentences.")
+
+class PeopleReflection(BaseModel):
+    """My impressions of people from a conversation."""
+    impressions: List[PersonImpression] = Field(description="One entry per person I noticed something about. Empty if I learned nothing new.")
+
+
 class SetupDesireOutput(BaseModel):
     """Output format for the name retrieval"""
     
