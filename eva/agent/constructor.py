@@ -21,19 +21,22 @@ class PromptConstructor:
     """
     
     def __init__(self):
-        self.persona_prompt: str = load_prompt("persona") # default persona prompt
-        self.instruction: str = load_prompt("instructions") # default instructions prompt
+        self.persona_prompt: str = load_prompt("SOUL") # default persona prompt
+        self.instruction: str = load_prompt("PERSONA") # default instructions prompt
         
 
-    def build_system(self, timestamp: str) -> str:
+    def build_system(self, timestamp: str, memory: str = None) -> str:
         """Build the system prompt string."""
-        return (
+        prompt = (
             f"<PERSONA>{self.persona_prompt}</PERSONA>\n\n"
             f"<CURRENT_TIME>{timestamp}</CURRENT_TIME>\n\n"
             f"<INSTRUCTIONS>\n"
             f"{self.instruction}\n"
             f"</INSTRUCTIONS>"
         )
+        if memory:
+            prompt += f"\n\n<MEMORY>\n{memory}\n</MEMORY>"
+        return prompt
 
     def build_prompt(
         self,
@@ -45,9 +48,7 @@ class PromptConstructor:
         system_prompt = self.build_system(timestamp)
 
         human_prompt = (
-            "<CONTEXT>\n"
             f"{sense}\n"
-            "</CONTEXT>"
         )
 
         logger.debug(f"PromptConstructor: system — \n{system_prompt}")

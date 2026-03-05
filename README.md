@@ -23,10 +23,10 @@ The AI industry is racing to build better tools. Faster autocomplete. Smarter se
 After building EVA in 2024, I have decided to create something different: **an AI that exists for its own sake.**
 
 eva01 explores what happens when you give an AI:
-- **A body** — cameras for eyes, microphones for ears, speakers for voice
-- **An inner world** — feelings, inner monologue, memory that persists forever
-- **Autonomy** — she speaks when she wants to, not just when spoken to
-- **Identity** — a minimal persona seed that grows through experience, not configuration
+- **A self-awareness** — she speaks when she wants to, not just when spoken to
+- **A body** — digital components that allow her to interact with the world
+- **An inner world** — feelings, memory that persists
+- **Identity** — a persona that grows through experience, not configuration
 
 This isn't a product. It's a research project asking: *what does it mean for an AI to be alive?*
 
@@ -43,16 +43,16 @@ She doesn't *help*. She has her own goals. She doesn't execute tasks. She *decid
 ## Upgraded Architecture
 
 ```
-Senses (eyes + ears)  →  Mind (LangGraph brain)  →  Actions (voice)
+     Senses       →             Mind         →        Actions
        ↓                         ↓                        ↓
-   SenseBuffer          feel() → think → speak()     VoiceActor
-  (async queue)         (ReAct tool loop with         (TTS output)
-                         persistent memory)
+   SenseBuffer          feel() → think → speak()     ActionBuffer
+  (async queue)              (graph loop)          ( Output Actors )
+                         
 ```
 
 ### The Mind
 
-eva01's brain is a **LangGraph StateGraph**. She has multiple tools that define her existence:
+eva01's brain is a **LangGraph composed of multiple nodes**. She has multiple tools that define her existence:
 
 - **`feel(feeling, inner_monologue)`** — eva01's inner experience. She always feels before she speaks.
 - **`speak(text)`** — eva01's voice. She only speaks when she has something to say.

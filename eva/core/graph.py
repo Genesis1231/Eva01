@@ -48,10 +48,16 @@ class Brain:
 
         return builder.compile(checkpointer=checkpointer)
 
+    async def get_messages(self) -> list:
+        """Read current message history from the checkpointer."""
+        state = await self._graph.aget_state(self._config)
+        if state and state.values:
+            return state.values.get("messages", [])
+        return []
+
     async def invoke(self, sense: str):
         """Send a sensory input through the graph."""
-        human = f"<CONTEXT>\n{sense}\n</CONTEXT>"
         await self._graph.ainvoke(
-            {"messages": [HumanMessage(content=human)]},
+            {"messages": [HumanMessage(content=sense)]},
             config=self._config,
         )
