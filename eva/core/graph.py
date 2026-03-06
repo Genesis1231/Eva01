@@ -12,7 +12,7 @@ from typing import List, Annotated, TypedDict
 
 from langchain_core.messages import HumanMessage, BaseMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
-from langgraph.graph import MessagesState, StateGraph, add_messages
+from langgraph.graph import StateGraph, add_messages
 from langgraph.prebuilt import ToolNode
 
 from eva.agent.chatagent import ChatAgent
@@ -37,11 +37,9 @@ class Brain:
         """Generate a new thread ID."""
         return f"eva-{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
 
-    def _get_config(self):
+    def _get_config(self) -> RunnableConfig:
         """Get the current config for graph execution."""
-        return RunnableConfig(configurable={
-            "thread_id": self.thread_id
-        })
+        return RunnableConfig(configurable={"thread_id": self.thread_id})
     
     def _build(self, checkpointer):
         """ Build the StateGraph for EVA's brain."""

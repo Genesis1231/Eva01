@@ -15,16 +15,15 @@ from eva.core.db import SQLiteHandler
 
 class JournalDB:
     """EVA's journal — episodic memory store."""
-
+    
     def __init__(self, db: SQLiteHandler):
         self._db = db
         self._initialized = False
 
     async def init_db(self) -> None:
+        """initialize_database."""
         if self._initialized:
             return
-
-        (DATA_DIR / "database").mkdir(parents=True, exist_ok=True)
         await self._db.execute(
             """
             CREATE TABLE IF NOT EXISTS journal (
@@ -46,7 +45,7 @@ class JournalDB:
         )
         self._initialized = True
 
-    async def add(self, content: str, session_id: str | None = None) -> str:
+    async def add(self, content: str, session_id: str) -> str:
         """Write an episode to the journal. Returns the entry id."""
         
         entry_id = uuid.uuid4().hex[:12]
@@ -61,7 +60,7 @@ class JournalDB:
             logger.error(f"JournalDB: failed to write journal — {e}")
             return ""
 
-    async def get_recent(self, limit: int = 10) -> List[str]:
+    async def get_recent(self, limit: int = 1) -> List[str]:
         """Get recent journal entries — today's entries, or last session's if none today."""
         
         today_start = datetime.now(timezone.utc).replace(

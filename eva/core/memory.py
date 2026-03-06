@@ -36,11 +36,6 @@ class MemoryDB:
         
         logger.debug(f"MemoryDB: ready (utility_model={self._pen}).")
 
-    async def init_db(self) -> None:
-        """Initialize journal storage."""
-        await self._journal.init_db()
-
-
     # ── Distillation ─────────────────────────────────────────
 
     @staticmethod

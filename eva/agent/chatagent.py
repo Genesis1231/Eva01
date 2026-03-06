@@ -21,7 +21,9 @@ from eva.tools import load_tools
 
 class ChatAgent:
     """EVA's brain process — wraps LLM + tools + prompt into a single think() call."""
-
+    
+    _TEMPTURE = 0.8  # creative but not too random
+    
     def __init__(
         self, 
         model_name: str, 
@@ -34,7 +36,10 @@ class ChatAgent:
         self.memory = memory
         self.constructor = PromptConstructor(people_db=people_db)
         self.tools = load_tools(action_buffer)
-        self._llm = init_chat_model(model_name, temperature=0.8).bind_tools(self.tools)
+        self._llm = init_chat_model(
+            model=model_name, 
+            temperature=self._TEMPTURE
+        ).bind_tools(self.tools)
 
         logger.debug(f"ChatAgent: {model_name} ready with {len(self.tools)} tools.")
 
@@ -60,7 +65,12 @@ class ChatAgent:
         # Optional: Cap the input tokens
         trimmed = trim_messages(distilled, max_tokens=8000, token_counter='approximate')
 
-        response = await self._llm.ainvoke([SystemMessage(content=system)] + trimmed)
+        try:
+            response = await self._llm.ainvoke([SystemMessage(content=system)] + trimmed)
+        except Exception as e:
+            logger.error(f"LLM ainvoke failed: {e}")
+            # Fallback to a safe AIMessage to prevent the agent from crashing
+            response = AIMessage(content="[I am having trouble forming a coherent thought right now.]")
 
         # resource usage logging
         if usage := response.usage_metadata:

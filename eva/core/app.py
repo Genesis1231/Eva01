@@ -42,11 +42,14 @@ async def weave(
 
     # People & Memory
     people_db = PeopleDB(db)
-    journal_db = JournalDB(db)    
+    journal_db = JournalDB(db)
+    
+    await asyncio.gather(
+        people_db.init_db(),
+        journal_db.init_db(),
+    )
     memory_db = MemoryDB(config.UTILITY_MODEL, people_db, journal_db)
-
-    asyncio.gather(people_db.init_db(), memory_db.init_db(), journal_db.init_db())  # parallel init
-
+    
     # initialize vision sense
     describer = Describer(config.VISION_MODEL)
     identifier = Identifier(people_db)
@@ -101,7 +104,7 @@ async def wake() -> None:
         sense_buffer, action_buffer, audio_sense, camera_sense, voice_actor, brain, memory_db = await weave(eva_configuration, db, checkpointer)
 
         logger.debug(f"EVA: session {brain.thread_id} — ready.")
-        await action_buffer.put("speak", "I am ready!.")
+        await action_buffer.put("speak", "I am ready!")
         print("\n   ... PRESS SPACE to talk to EVA ...")
 
         try:
@@ -115,7 +118,10 @@ async def wake() -> None:
             # Journal
             messages = await brain.get_messages()
             if messages:
-                await memory_db.flush(messages, session_id=brain.thread_id)
+                try:
+                    await memory_db.flush(messages, session_id=brain.thread_id)
+                except Exception as e:
+                    logger.error(f"EVA: failed to flush memory — {e}")
 
             audio_sense.stop()
             if camera_sense:
