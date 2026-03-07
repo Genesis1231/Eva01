@@ -70,11 +70,11 @@ async def weave(
     audio_sense = AudioSense(transcriber, keyboard=True, voice_actor=voice_actor)
     audio_sense.start(sense_buffer)
 
-    # Brain — ChatAgent owns LLM + tools, Brain owns workflow
-    agent = ChatAgent(config.CHAT_MODEL, action_buffer, memory=memory_db, people_db=people_db)
-    brain = Brain(agent, checkpointer=checkpointer)
+    # Brain — ChatAgent owns LLM + tools, Brain owns workflow + memory
+    agent = ChatAgent(config.CHAT_MODEL, action_buffer, people_db=people_db)
+    brain = Brain(agent, memory=memory_db, checkpointer=checkpointer)
 
-    return sense_buffer, action_buffer, audio_sense, camera_sense, voice_actor, brain, memory_db
+    return sense_buffer, action_buffer, audio_sense, camera_sense, voice_actor, brain
 
 
 async def breathe(sense_buffer: SenseBuffer, brain: Brain) -> None:
@@ -101,7 +101,7 @@ async def wake() -> None:
     db = SQLiteHandler()
 
     async with AsyncSqliteSaver.from_conn_string(str(graph_db)) as checkpointer:
-        sense_buffer, action_buffer, audio_sense, camera_sense, voice_actor, brain, memory_db = await weave(eva_configuration, db, checkpointer)
+        sense_buffer, action_buffer, audio_sense, camera_sense, voice_actor, brain = await weave(eva_configuration, db, checkpointer)
 
         logger.debug(f"EVA: session {brain.thread_id} — ready.")
         await action_buffer.put("speak", "I am ready!")
@@ -119,7 +119,7 @@ async def wake() -> None:
             messages = await brain.get_messages()
             if messages:
                 try:
-                    await memory_db.flush(messages, session_id=brain.thread_id)
+                    await brain.memory.flush(messages, session_id=brain.thread_id)
                 except Exception as e:
                     logger.error(f"EVA: failed to flush memory — {e}")
 

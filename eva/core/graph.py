@@ -16,6 +16,7 @@ from langgraph.graph import StateGraph, add_messages
 from langgraph.prebuilt import ToolNode
 
 from eva.agent.chatagent import ChatAgent
+from eva.core.memory import MemoryDB
 from eva.senses.sense_buffer import SenseEntry
 
 
@@ -25,10 +26,11 @@ class EvaState(TypedDict):
 
 
 class Brain:
-    """EVA's brain graph — topology only, agent owns the process."""
+    """EVA's brain graph — orchestrates agent, memory, and workflow."""
 
-    def __init__(self, agent: ChatAgent, checkpointer=None):
+    def __init__(self, agent: ChatAgent, memory: MemoryDB, checkpointer=None):
         self.agent = agent
+        self.memory = memory
         self.thread_id = self._new_thread_id()
         self._config = self._get_config()
         self._graph = self._build(checkpointer)
@@ -44,12 +46,15 @@ class Brain:
     def _build(self, checkpointer):
         """ Build the StateGraph for EVA's brain."""
         agent = self.agent
+        memory = self.memory
 
         async def think(state: EvaState):
             """ The "think" node — EVA processes messages and decides on tool calls."""
+            distilled, journal = await memory.prepare_context(state["messages"])
             response = await agent.think(
-                state["messages"],
+                distilled,
                 present_people=state.get("present_people", []),
+                journal=journal,
             )
             return {"messages": [response]}
 
@@ -88,11 +93,9 @@ class Brain:
         if entry.metadata and "faces" in entry.metadata:
             face_ids = entry.metadata["faces"]
 
-        # Core orchestration owns state updates for seen people.
-        people_db = getattr(self.agent.constructor, "people_db", None)
-        if people_db and face_ids:
-            for face_id in set(face_ids):
-                await people_db.touch(face_id)
+        # Track seen people for relationship reflection at flush time.
+        if face_ids:
+            self.memory.add_people_to_session(set(face_ids))
 
         await self._graph.ainvoke(
             {
