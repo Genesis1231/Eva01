@@ -41,12 +41,19 @@ class PromptConstructor:
         )
 
         people_block = self._build_people_block(present_people)
-        prompt += f"\n\nI remember {people_block}"
+        has_memory = people_block or memory
 
-        if memory:
-            prompt += f"\n\n<MEMORY>\n{memory}\n</MEMORY>"
+        if has_memory:
+            prompt += "\n\n<MEMORY>"
+            if people_block:
+                prompt += f"\n{people_block}"
+            if memory:
+                prompt += f"\n{memory}"
+            prompt += "\n</MEMORY>"
 
         prompt += f"\n\n<CURRENT_TIME>{timestamp}</CURRENT_TIME>\n\n"
+        
+        logger.debug(f"Constructed system prompt:\n{prompt}")
         return prompt
 
     def _build_people_block(self, present_people: list[str] | None) -> str :

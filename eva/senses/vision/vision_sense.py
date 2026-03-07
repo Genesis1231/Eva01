@@ -149,15 +149,18 @@ class CameraSense:
         # Extract face IDs for known people
         face_ids = [f["id"] for f in faces if f.get("id")]
 
-        # Combine: "[Alice, unknown person] Two people at desk, one waving"
-        parts = []
+        # Combine: "I see Alice — sitting at desk, waving."
         if faces:
-            names = [f["name"] for f in faces]
-            parts.append(f"[{', '.join(names)}]")
-        if description:
-            parts.append(description)
+            names = ", ".join(f["name"] for f in faces)
+            if description:
+                desc = description[0].lower() + description[1:] if description else ""
+                observation = f"I see {names} — {desc}"
+            else:
+                observation = f"I see {names}."
+        else:
+            observation = f"I see {description}" if description else None
 
-        return (" ".join(parts) if parts else None), face_ids
+        return observation, face_ids
 
     async def _describe(self, frame: np.ndarray) -> str | None:
         """Describe frame using vision model (async network I/O)."""

@@ -8,7 +8,7 @@ Context assembly:
     journal (recent entries) + distilled current session → system prompt
 """
 import asyncio
-from typing import cast
+from typing import Iterable, cast
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
@@ -29,10 +29,13 @@ class MemoryDB:
         journal_db: JournalDB,
     ):
         self._journal = journal_db
+        self._people = people_db
         self._journal_prompt = load_prompt("journal")
         self._relationships_prompt = load_prompt("relationships")
         self._pen = init_chat_model(utility_model)
-        self._people = people_db
+
+        # Person IDs seen during the current session, populated by graph orchestration.
+        self._session_people_ids: set[str] = set()
         
         logger.debug(f"MemoryDB: ready (utility_model={utility_model}).")
 
@@ -149,6 +152,7 @@ class MemoryDB:
         """
         if not messages:
             logger.debug("MemoryDB: nothing to flush.")
+            self.clear_session_people()
             return False
 
         # Distill entire session (treat all messages as history)
@@ -164,19 +168,24 @@ class MemoryDB:
 
         if not parts:
             logger.debug("MemoryDB: distilled to nothing, skipping flush.")
+            self.clear_session_people()
             return False
 
         conversation = "\n".join(parts)
+        logger.debug(f"MemoryDB: writing journal entry for conversation:\n{conversation}")
+        
+        try:
+            # Journal the session via utility LLM
+            journal, _ = await asyncio.gather(
+                self._reflect_messages(conversation),
+                self._reflect_people(conversation)
+            )
 
-        # Journal the session via utility LLM
-        journal, _ = await asyncio.gather(
-            self._reflect_messages(conversation),
-            self._reflect_people(conversation)
-        )
-
-        await self._journal.add(journal, session_id)
-        logger.debug(f"MemoryDB: journaled session ({len(journal.split())} words).")
-        return True
+            await self._journal.add(journal, session_id)
+            logger.debug(f"MemoryDB: journaled session: {journal}.")
+            return True
+        finally:
+            self.clear_session_people()
 
     async def _reflect_messages(self, conversation: str) -> str:
         """Reflect on a conversation and return a journal entry."""
@@ -193,37 +202,33 @@ class MemoryDB:
             return conversation
 
     # ── Relationship Extraction ─────────────────────────────────────
+    def add_people_to_session(self, person_ids: Iterable[str]) -> None:
+        """Track people seen this session so relationship reflection can use IDs, not names."""
+        for person_id in person_ids:
+            self._session_people_ids.add(person_id)
 
+    def clear_session_people(self) -> None:
+        """Reset tracked session people after flush completes."""
+        self._session_people_ids.clear()
+    
     async def _reflect_people(self, conversation: str) -> None:
         """Extract per-person impressions from a session and append to PeopleDB."""
-        if not self._pen or not self._people:
+
+        if not self._session_people_ids:
+            logger.debug("MemoryDB: no people seen this session, skipping relationship reflection.")
             return
 
-        all_people = self._people.get_all()
-        if not all_people:
-            return
-
-        # Only send people actually mentioned in the conversation
-        conv_lower = conversation.lower()
-        mentioned = {
-            pid: p for pid, p in all_people.items()
-            if p["name"].lower() in conv_lower
-            or p["name"].split()[0].lower() in conv_lower.split()
-        }
+        await self._people.touch(self._session_people_ids)
+        mentioned = self._people.get_many(self._session_people_ids)
         if not mentioned:
+            logger.debug("MemoryDB: no people in the session for relationship reflection.")
             return
-
-        # Build people list for the prompt
-        people_lines = []
-        for pid, person in mentioned.items():
-            rel = person.get("relationship") or "no relationship noted"
-            people_lines.append(f"{pid}: {person['name']} ({rel})")
-
-        prompt = self._relationships_prompt.replace(
-            "{conversation}", conversation
-        ).replace(
-            "{people}", "\n".join(people_lines)
-        )
+        
+        prompt_people = self._people.render_people(mentioned)
+        prompt = self._relationships_prompt.format(
+            conversation=conversation, 
+            people=prompt_people
+        ) 
 
         try:
             structured_pen = self._pen.with_structured_output(PeopleReflection)
@@ -232,7 +237,7 @@ class MemoryDB:
             logger.error(f"MemoryDB: relationship extraction failed — {e}")
             return
 
-        # Write validated impressions to PeopleDB
-        for entry in reflection.impressions:
-            if entry.person_id in mentioned:
-                await self._people.append_notes(entry.person_id, entry.impression)
+        await self._people.append_reflection_notes(
+            mentioned=self._session_people_ids,
+            impressions=reflection.impressions,
+        )

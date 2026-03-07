@@ -4,7 +4,7 @@ stored in a SQLite database with an in-memory cache for quick access.
 """
 
 from datetime import datetime, timezone
-from typing import Dict
+from typing import Iterable, Dict, Set
 
 from config import logger, DATA_DIR
 from eva.core.db import SQLiteHandler
@@ -61,6 +61,14 @@ class PeopleDB:
         """Get all people from the database."""
         return self._cache
 
+    def get_many(self, person_ids: Iterable[str]) -> Dict[str, Dict]:
+        """Get a subset of known people by id."""
+        return {
+            person_id: person
+            for person_id in person_ids
+            if (person := self._cache.get(person_id)) is not None
+        }
+
     def get_id_name_map(self) -> Dict[str, str]:
         """Get a lightweight snapshot of known people: id -> name."""
         return {
@@ -68,6 +76,7 @@ class PeopleDB:
             for person_id, person in self._cache.items()
             if person.get("name")
         }
+
 
     async def add(self, person_id: str, name: str, relationship: str | None = None) -> bool:
         """Register a new person to the database."""
@@ -94,17 +103,29 @@ class PeopleDB:
             logger.error(f"PeopleDB: Failed to add {person_id} — {e}")
             return False
 
-    async def touch(self, person_id: str) -> None:
-        """Update last_seen to now."""
+    async def touch(self, person_id: str | Set[str]) -> None:
+        """Update last_seen to now for one or multiple people."""
+
+        if not person_id:
+            return
+                    
         now = datetime.now(timezone.utc).isoformat()
         try:
-            await self._db.execute(
+            if isinstance(person_id, str):
+                person_ids = {person_id}
+            else:
+                person_ids = set(person_id)
+
+            await self._db.executemany(
                 "UPDATE people SET last_seen = ? WHERE id = ?",
-                (now, person_id),
+                [(now, pid) for pid in person_ids],
             )
-            if person_id in self._cache:
-                self._cache[person_id]["last_seen"] = now
-                logger.debug(f"PeopleDB: Touched {person_id}.")
+
+            for pid in person_ids:
+                if pid in self._cache:
+                    self._cache[pid]["last_seen"] = now
+
+            logger.debug(f"PeopleDB: Touched {', '.join(person_ids)}.")
                 
         except Exception as e:
             logger.error(f"PeopleDB: Failed to touch {person_id} — {e}")
@@ -128,3 +149,18 @@ class PeopleDB:
             logger.debug(f"PeopleDB: noted impression for {person_id}.")
         except Exception as e:
             logger.error(f"PeopleDB: Failed to update notes for {person_id} — {e}")
+
+    async def append_reflection_notes(self, mentioned: set[str], impressions: list) -> None:
+        """Persist validated LLM impressions for people that were in scope."""
+        for entry in impressions:
+            if entry.person_id in mentioned:
+                await self.append_notes(entry.person_id, entry.impression)
+
+    @staticmethod
+    def render_people(people: Dict[str, Dict]) -> str:
+        """Render people context lines for the relationship reflection prompt."""
+        lines = []
+        for pid, person in people.items():
+            rel = person.get("relationship") or "no relationship noted"
+            lines.append(f"{pid}: {person['name']} ({rel})")
+        return "\n".join(lines)

@@ -1,2 +1,2 @@
-What do you see? People: count, doing what, expression, appearance. 
-Only mention what stands out. Pure observation, no interpretation. Under 50 words.
+Describe the scene. What are people doing, their expression, appearance.
+Ignore ordinary objects. Pure observation, no interpretation. Under 30 words.

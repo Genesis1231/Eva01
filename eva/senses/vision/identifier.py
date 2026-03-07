@@ -12,7 +12,7 @@ class Identifier:
     """EVA's facial recognition — matches faces to people she knows."""
 
     _MODEL_NAME = "Facenet512"
-    _DETECTOR_BACKEND = "opencv"
+    _DETECTOR_BACKEND = "retinaface"
     _CERTAIN_DISTANCE_THRESHOLD = 0.20  # Below this, we are quite confident in the match.
     _LIKELY_DISTANCE_THRESHOLD = 0.40 # Below this, we think it's likely but not certain.
 
@@ -40,6 +40,7 @@ class Identifier:
         Returns:
             List of dicts with keys: id, name.
         """
+        
         # Quick check if we have any faces to match against
         # This is faster than iterating through the database
         logger.debug("Identifier: Starting identification process.")
@@ -91,6 +92,7 @@ class Identifier:
                 continue
 
             distance = float(match.get("distance", 1.0))
+            logger.debug(f"Identifier: Identification results — {name} (id: {person_id}), distance: {distance:.4f}")
             if distance <= self._CERTAIN_DISTANCE_THRESHOLD:
                 results.append(
                     {

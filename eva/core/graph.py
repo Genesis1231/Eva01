@@ -85,8 +85,7 @@ class Brain:
 
     async def invoke(self, entry: SenseEntry):
         """Send a sensory input through the graph."""
-        prefix = "I hear: " if entry.type == "audio" else "I see: "
-        content = prefix + entry.content
+        content = entry.content
 
         # Extract face IDs from vision metadata
         face_ids = []
