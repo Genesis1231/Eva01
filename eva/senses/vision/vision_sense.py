@@ -1,7 +1,7 @@
 from config import logger
 import asyncio
 from pathlib import Path
-
+from typing import Dict, List
 import numpy as np
 import cv2
 
@@ -49,7 +49,7 @@ class CameraSense:
     def start(self, buffer: SenseBuffer) -> None:
         """Start the background vision task, writing observations to buffer."""
         if self.webcam.camera is None:
-            logger.info("CameraSense: No camera — skipping vision.")
+            logger.warning("CameraSense: No camera — skipping vision.")
             return
         if self._task is not None and not self._task.done():
             logger.warning("CameraSense: Already running.")
@@ -57,7 +57,7 @@ class CameraSense:
 
         self._stop_event.clear()
         self._task = asyncio.create_task(self._run(buffer))
-        logger.info("CameraSense: Started.")
+        logger.debug("CameraSense: Started.")
 
     async def stop(self) -> None:
         """Stop the vision task and release resources."""
@@ -70,31 +70,30 @@ class CameraSense:
             self.webcam.release()
             return
 
-        logger.info("CameraSense: Stopping...")
+        logger.debug("CameraSense: Stopping...")
         self._stop_event.set()
         try:
             await self._task
         finally:
             self._task = None
             self.webcam.release()
-        logger.info("CameraSense: Stopped.")
+        logger.debug("CameraSense: Stopped.")
 
     async def _run(self, buffer: SenseBuffer) -> None:
         """Main loop: capture -> detect change -> describe -> write to buffer."""
-        logger.info("CameraSense: Capture loop started.")
 
         while not self._stop_event.is_set():
             try:
-                frame = await asyncio.to_thread(self.webcam.capture)
+                frame = await asyncio.to_thread(self.webcam.capture_photo)
 
                 if self._has_scene_changed(frame):
-                    logger.info("CameraSense: Scene change detected, observing...")
+                    logger.debug("CameraSense: Scene change detected, observing...")
                     observation, face_ids = await self._observe(frame)
 
                     if observation:
                         metadata = {"faces": face_ids} if face_ids else None
                         buffer.push("observation", observation, metadata=metadata)
-                        logger.info(f"CameraSense: {observation[:80]}...")
+                        logger.debug(f"CameraSense: {observation}...")
 
             except Exception as e:
                 logger.error(f"CameraSense: Capture loop error — {e}")
@@ -104,11 +103,13 @@ class CameraSense:
             except asyncio.TimeoutError:
                 pass
 
-        logger.info("CameraSense: Capture loop stopped.")
+        logger.debug("CameraSense: Capture loop stopped.")
 
     def _has_scene_changed(self, frame: np.ndarray) -> bool:
         """Motion detection via grayscale pixel diff."""
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # Resize first for efficiency and noise reduction
+        small = cv2.resize(frame, self._COMPRESSED_SIZE)
+        gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
 
         if self._previous_frame is None:
             self._previous_frame = gray
@@ -121,21 +122,20 @@ class CameraSense:
 
         return change_ratio > self._CHANGE_THRESHOLD
 
-    async def _observe(self, frame: np.ndarray) -> tuple[str | None, list[str]]:
+    async def _observe(self, frame: np.ndarray) -> tuple[str | None, List[str]]:
         """Run description and face identification in parallel, combine results.
 
         Returns (observation_text, face_ids) — face_ids are PeopleDB IDs for recognized faces.
         """
-        async def _no_faces():
-            return []
 
         description, faces = await asyncio.gather(
             self._describe(frame),
-            self._identify(frame) if self.identifier else _no_faces(),
+            self._identify(frame),
             return_exceptions=True,
         )
-        description = description if not isinstance(description, Exception) else None
-        faces = faces if not isinstance(faces, Exception) else []
+        
+        description = description if not isinstance(description, BaseException) else None
+        faces = faces if not isinstance(faces, BaseException) else []
 
         if not description and not faces:
             return None, []
@@ -158,17 +158,19 @@ class CameraSense:
         resized = cv2.resize(frame, self._COMPRESSED_SIZE)
         return await self.describer.describe(resized)
 
-    async def _identify(self, frame: np.ndarray) -> list[dict]:
+    async def _identify(self, frame: np.ndarray) -> List[Dict]:
         """Identify faces in frame (CPU-bound via thread pool)."""
+        if self.identifier is None:
+            return []
         return await asyncio.to_thread(self.identifier.identify, frame)
 
-    def capture_photo(self, save_path: str) -> None:
+    def capture(self, save_path: str) -> None:
         """On-demand photo capture (for face registration etc)."""
         try:
-            frame = self.webcam.capture()
+            frame = self.webcam.capture_photo()
             path = Path(save_path)
             path.parent.mkdir(parents=True, exist_ok=True)
             cv2.imwrite(str(path), frame)
-            logger.info(f"CameraSense: Photo saved to {path}")
+            logger.debug(f"CameraSense: Photo saved to {path}")
         except Exception as e:
             logger.error(f"CameraSense: Photo capture error — {e}")

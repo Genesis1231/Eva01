@@ -80,7 +80,7 @@ class PeopleDB:
                 "id": person_id, "name": name, "relationship": relationship,
                 "first_seen": now, "last_seen": now, "notes": None,
             }
-            logger.info(f"PeopleDB: Added {name} ({person_id}).")
+            logger.debug(f"PeopleDB: Added {name} ({person_id}).")
             return True
         except Exception as e:
             logger.error(f"PeopleDB: Failed to add {person_id} — {e}")

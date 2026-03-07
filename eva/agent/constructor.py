@@ -26,8 +26,14 @@ class PromptConstructor:
         self.instructions: str = load_prompt("INSTRUCTIONS") # default instructions prompt
         self.people_db = people_db
 
-    def build_system(self, timestamp: str, memory: str = None, present_people: list[str] = None) -> str:
+    def build_system(
+        self, 
+        timestamp: str, 
+        memory: str = "", 
+        present_people: list[str] = []
+        ) -> str:
         """Build the system prompt string."""
+        
         prompt = (
             f"<PERSONA>{self.soul}</PERSONA>\n\n"
             f"<INSTRUCTIONS>\n"
@@ -36,8 +42,7 @@ class PromptConstructor:
         )
 
         people_block = self._build_people_block(present_people)
-        if people_block:
-            prompt += f"\n\n{people_block}"
+        prompt += f"\n\nI remember {people_block}"
 
         if memory:
             prompt += f"\n\n<MEMORY>\n{memory}\n</MEMORY>"
@@ -45,10 +50,11 @@ class PromptConstructor:
         prompt += f"\n\n<CURRENT_TIME>{timestamp}</CURRENT_TIME>\n\n"
         return prompt
 
-    def _build_people_block(self, present_people: list[str] | None) -> str | None:
+    def _build_people_block(self, present_people: list[str] | None) -> str :
         """Build <PEOPLE> block from face IDs currently visible to EVA."""
+        
         if not present_people or not self.people_db:
-            return None
+            return ""
 
         entries = []
         for person_id in present_people:
@@ -70,8 +76,5 @@ class PromptConstructor:
                 entry += f"\n{last}"
 
             entries.append(entry)
-
-        if not entries:
-            return None
 
         return "<PEOPLE>\n" + "\n\n".join(entries) + "\n</PEOPLE>"

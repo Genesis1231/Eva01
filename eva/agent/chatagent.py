@@ -22,7 +22,7 @@ from eva.tools import load_tools
 class ChatAgent:
     """EVA's brain process — wraps LLM + tools + prompt into a single think() call."""
     
-    _TEMPTURE = 0.8  # creative but not too random
+    _TEMPERATURE = 0.8  # creative but not too random
     
     def __init__(
         self, 
@@ -38,7 +38,7 @@ class ChatAgent:
         self.tools = load_tools(action_buffer)
         self._llm = init_chat_model(
             model=model_name, 
-            temperature=self._TEMPTURE
+            temperature=self._TEMPERATURE
         ).bind_tools(self.tools)
 
         logger.debug(f"ChatAgent: {model_name} ready with {len(self.tools)} tools.")

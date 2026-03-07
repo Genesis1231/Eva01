@@ -19,4 +19,4 @@ class Screen:
         meta = event.metadata or {}
         title = meta.get("title", "Unknown")
         channel = meta.get("channel", "Unknown")
-        logger.info(f"Screen: watch '{title}' by {channel} — video_id={event.content}")
+        logger.debug(f"Screen: watch '{title}' by {channel} — video_id={event.content}")

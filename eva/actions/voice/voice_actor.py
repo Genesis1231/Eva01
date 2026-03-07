@@ -58,7 +58,7 @@ class VoiceActor:
         """Handle interrupt: stop current speech."""
         if self.current_speech_task and not self.current_speech_task.done():
             await self._cancel_speech()
-            logger.info("Voice actor interrupted speech.")
+            logger.debug("Voice actor interrupted speech.")
 
     async def _cancel_speech(self):
         """Cancel current speech task and stop speaker output."""
