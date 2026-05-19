@@ -22,7 +22,7 @@ class WhisperTranscriber:
         self.model: OpenAI = OpenAI()
         self.sample_rate: int = 16000
     
-    def transcribe_audio(self, audioclip) -> tuple[Optional[str], Optional[str]]:
+    def transcribe_audio(self, audioclip) -> tuple[str, str] | None:
         """ Transcribe the given audio clip using the OpenAI Whisper model """
 
         if not isinstance(audioclip, (List, ndarray)):

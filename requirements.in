@@ -33,7 +33,7 @@ firecrawl-py==4.18.1
 tavily-python==0.7.23
 
 # Memory and embeddings
-fastembed==0.7.4
+fastembed==0.8.0
 sqlite-vec==0.1.6
 
 # Audio

@@ -127,7 +127,7 @@ exceptiongroup==1.3.1
     #   pytest
 fastapi==0.135.1
     # via -r requirements.in
-fastembed==0.7.4
+fastembed==0.8.0
     # via -r requirements.in
 faster-whisper==1.2.1
     # via -r requirements.in

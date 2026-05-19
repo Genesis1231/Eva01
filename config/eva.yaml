@@ -39,6 +39,7 @@ system:
 models:
   # The core reasoning engine orchestrating EVA's personality and logic.
   # Common providers: "claude", "groq", "chatgpt", "mistral", "gemini", "llama"
+  # AWS: bedrock_converse:us.anthropic.claude-opus-4-6-v1
   # Recommended: "claude-4.0-sonnet" (for highest emotional intelligence)
   main: "anthropic:claude-opus-4-6"
 
