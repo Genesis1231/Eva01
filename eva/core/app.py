@@ -109,7 +109,7 @@ async def assemble(
     audio_sense = AudioSense(
         transcriber,
         speaker_identifier=speaker_identifier,
-        on_interrupt=lambda: voice_actor.speaker.stop_speaking(),
+        on_interrupt=voice_actor.interrupt_from_thread,
         is_speaking=lambda: voice_actor.is_speaking,
     )
     audio_sense.start(sense_buffer)

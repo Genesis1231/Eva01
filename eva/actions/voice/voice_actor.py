@@ -1,12 +1,13 @@
 """
 VoiceActor:
-    EVA's voice — handles speak/interrupt actions from ActionBuffer.
-    Two independent audio channels: speech (via Speaker) and music (via AudioPlayer).
+    EVA's voice — owns its own speech queue with a worker task so the
+    global action bus never blocks on speech timing.
 
     register(buffer) -> registers speak/interrupt handlers on ActionBuffer
-    stop() -> stops all audio
-    play_music(url) -> start/replace background music (does not interrupt speech)
-    stop_music() -> stop background music only
+    start()          -> launches the worker task
+    interrupt()      -> async: signals in-flight speech to stop and drops queued speech
+    interrupt_from_thread() -> thread-safe barge-in for AudioSense
+    stop()           -> stops worker and releases speaker
 """
 
 import asyncio
@@ -19,65 +20,98 @@ from ..base import BaseAction
 
 class VoiceActor(BaseAction):
     """
-    Two-channel audio actor: speech and music run independently.
-    Registers as handler on ActionBuffer for speak/interrupt events.
+    Speech runs serially through an internal worker; the global ActionBuffer
+    dispatcher only ever enqueues, so an interrupt event behind a speak event
+    can preempt instead of waiting.
     """
 
     def __init__(self, speaker: Speaker):
-        self.speaker = speaker or Speaker()
-        self.current_speech_task: asyncio.Task | None = None
-        self.is_speaking: bool = False
+        self.speaker = speaker
+        self._queue: asyncio.Queue[ActionEvent] = asyncio.Queue()
+        self._worker_task: asyncio.Task | None = None
+        self._current_speech: asyncio.Task | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+
+    @property
+    def is_speaking(self) -> bool:
+        return self._current_speech is not None
 
     def register(self, buffer: ActionBuffer) -> None:
-        """Register speak/interrupt handlers on the action buffer."""
-        buffer.on("speak", self._handle_speak)
+        buffer.on("speak", self._enqueue)
         buffer.on("interrupt", self._handle_interrupt)
-        
-    async def _handle_speak(self, event: ActionEvent) -> None:
-        """Handle speak: wait for current speech to finish, then speak next."""
-        if not event.content:
-            return
 
-        # Queue: wait for previous speech to finish instead of cancelling
-        if self.current_speech_task and not self.current_speech_task.done():
+    async def _enqueue(self, event: ActionEvent) -> None:
+        if event.content:
+            await self._queue.put(event)
+
+    async def _handle_interrupt(self, event: ActionEvent) -> None:
+        await self.interrupt()
+
+    async def interrupt(self) -> None:
+        """Signal stop and drop queued speech.
+
+        Does NOT cancel the in-flight asyncio task — Python threads can't
+        be killed, so cancelling would lie about state while the thread
+        keeps running (risk: overlap, audio after interrupt, use-after-close
+        on shutdown). The worker's await on _current_speech blocks until
+        the thread actually returns; is_speaking stays True until then.
+        """
+        self.speaker.stop_speaking()
+
+        while not self._queue.empty():
             try:
-                await self.current_speech_task
+                self._queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+
+        logger.debug("VoiceActor: stop signalled, queue drained.")
+
+    def interrupt_from_thread(self) -> None:
+        """Thread-safe barge-in: kill audio now, schedule full cleanup."""
+        self.speaker.stop_speaking()
+        if self._loop and self._loop.is_running():
+            asyncio.run_coroutine_threadsafe(self.interrupt(), self._loop)
+
+    async def _worker(self) -> None:
+        """Consume the speech queue serially. Waits for each thread to finish
+        before pulling the next event, so interrupted speech can't overlap
+        with a follow-up speak."""
+        while True:
+            event = await self._queue.get()
+            if not event.content:
+                continue
+
+            language = (event.metadata or {}).get("language", "en")
+            self._current_speech = asyncio.create_task(
+                asyncio.to_thread(self.speaker.speak, event.content, language)
+            )
+            try:
+                await self._current_speech
+            except Exception as e:
+                logger.error(f"VoiceActor: speech error — {e}")
+            finally:
+                self._current_speech = None
+
+    async def start(self) -> None:
+        """Launch the speech worker."""
+        self._loop = asyncio.get_running_loop()
+        self._worker_task = asyncio.create_task(self._worker())
+
+    async def stop(self) -> None:
+        await self.interrupt()
+
+        if self._current_speech and not self._current_speech.done():
+            try:
+                await self._current_speech
+            except Exception as e:
+                logger.error(f"VoiceActor: error during stop — {e}")
+
+        if self._worker_task:
+            self._worker_task.cancel()
+            try:
+                await self._worker_task
             except (asyncio.CancelledError, Exception):
                 pass
 
-        language = (event.metadata or {}).get("language", "en")
-        self.is_speaking = True
-
-        self.current_speech_task = asyncio.create_task(
-            asyncio.to_thread(self.speaker.speak, event.content, language)
-        )
-        self.current_speech_task.add_done_callback(
-            lambda _: setattr(self, 'is_speaking', False)
-        )
-
-    async def _handle_interrupt(self, event: ActionEvent) -> None:
-        """Handle interrupt: stop current speech."""
-        if self.current_speech_task and not self.current_speech_task.done():
-            await self._cancel_speech()
-            logger.debug("Voice actor interrupted speech.")
-
-    async def _cancel_speech(self):
-        """Cancel current speech task and stop speaker output."""
-        if self.current_speech_task and not self.current_speech_task.done():
-            self.speaker.stop_speaking()
-            try:
-                await self.current_speech_task
-            except Exception:
-                pass
-        self.current_speech_task = None
-        self.is_speaking = False
-
-    async def start(self) -> None:
-        """ No background tasks to start for VoiceActor"""
-        pass
-    
-    async def stop(self):
-        """Stop all audio channels and release models."""
-        await self._cancel_speech()
         self.speaker.close()
         logger.debug("Voice Actor stopped.")

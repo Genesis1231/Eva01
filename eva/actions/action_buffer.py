@@ -65,7 +65,31 @@ class ActionBuffer:
         Multiple handlers per type are supported — all will be called
         in registration order when an event of that type arrives.
         """
-        self._handlers[action_type].append(handler)
+        
+        if handler in self._handlers[action_type]:
+            logger.warning(f"ActionBuffer: handler already registered for <{action_type}>.")
+            return
+        try:
+            self._handlers[action_type].append(handler)
+        except Exception as e:
+            logger.error(f"ActionBuffer: error registering handler for <{action_type}> — {e}")
+
+    def off(self, action_type: str, handler: ActionHandler) -> None:
+        """Unregister a handler for an action type if it is currently registered."""
+        
+        handlers = self._handlers.get(action_type)
+        if not handlers:
+            logger.warning(f"ActionBuffer: no handlers found for <{action_type}>, cannot unregister.")
+            return
+
+        try:
+            handlers.remove(handler)
+        except Exception as e:
+            logger.error(f"ActionBuffer: error unregistering handler for <{action_type}> — {e}")
+            return
+        
+        if not handlers:
+            self._handlers.pop(action_type, None)   
 
     # ── Producer side (async — called by LangGraph tools) ────────────────
 
@@ -108,7 +132,7 @@ class ActionBuffer:
                     logger.warning(f"ActionBuffer: no handler for <{event.type}>, dropped.")
                     continue
 
-                for handler in handlers:
+                for handler in tuple(handlers):
                     try:
                         await handler(event)
                     except Exception as e:

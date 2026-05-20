@@ -56,12 +56,17 @@ class WebSocketActor(BaseAction):
         self.websocket = websocket
         self.session_id = session_id
         self._active = True
+        self._buffer: ActionBuffer | None = None
 
     def register(self, buffer: ActionBuffer) -> None:
+        self._buffer = buffer
         buffer.on("speak", self._handle_speak)
 
     def deactivate(self) -> None:
         self._active = False
+        if self._buffer is not None:
+            self._buffer.off("speak", self._handle_speak)
+            self._buffer = None
 
     async def _handle_speak(self, event: ActionEvent) -> None:
         if not self._active or not event.content:
