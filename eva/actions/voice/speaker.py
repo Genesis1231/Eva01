@@ -70,11 +70,10 @@ class Speaker:
         logger.debug(f"Speaker: {self._model_name} is ready.")
         return self.model
 
-
-
     def stop_speaking(self) -> None:
         """ Stop the speaker model. Thread-safe. """
         if self.model is None or not hasattr(self.model, 'stop_playback'):
+            logger.error("Speaker: TTS model not initialized or does not support stopping playback.")
             return
 
         self.model.stop_playback()
@@ -83,7 +82,8 @@ class Speaker:
         """ Speak the given text. Blocking — run via to_thread. """
 
         if self.model is None or not hasattr(self.model, 'eva_speak'):
-            return
+            logger.error("Speaker: TTS model not initialized or does not support speaking.")
+            raise
         
         try:
             print(f"\n({datetime.now().strftime('%H:%M:%S')}) EVA: {answer}")
@@ -95,6 +95,7 @@ class Speaker:
     async def get_audio(self, text: str) -> str:
         """ Generate audio from text and save it to the media folder """
         if self.model is None or not hasattr(self.model, 'generate_audio'):
+            logger.error("Speaker: TTS model not initialized or does not support audio generation.")
             return ""
         
         return await self.model.generate_audio(text, self._language, DATA_DIR / 'media')

@@ -32,6 +32,11 @@ class Browser(BaseAction):
     async def _handle_show(self, event: ActionEvent) -> None:
         """Open a URL in the host browser."""
         url = event.content
+        
+        if not url or not url.startswith(("http://", "https://")):
+            logger.error(f"Browser: invalid URL '{url}'")
+            return
+        
         logger.debug(f"Browser: opening {url}")
         try:
             _open_url(url)

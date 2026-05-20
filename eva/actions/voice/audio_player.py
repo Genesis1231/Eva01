@@ -16,12 +16,7 @@ class AudioPlayer:
     sample_rate (int): The sample rate of the audio data.
     speaking (bool): A flag to indicate if audio is currently speaking.
     audio_thread (threading.Thread): A thread to play audio.
-    
-    Methods:
-    play_audio: Play audio data from a file or numpy array.
-    play_mp3_stream: Play an mp3 stream.
-    play_stream: Play an mp3 url.
-    stop_playback: Interrupt all playback.
+
     """
     def __init__(self):
         self.player: mpv.MPV | None = None

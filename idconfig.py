@@ -18,7 +18,7 @@ from tabulate import tabulate
 from config import DATA_DIR
 from eva.database.db import SQLiteHandler
 from eva.core.people import PeopleDB
-from record_void import PROMPTS, SAMPLE_RATE, record_one
+from config.record_void import PROMPTS, SAMPLE_RATE, record_one
 from silero_vad import load_silero_vad
 import soundfile as sf
 

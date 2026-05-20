@@ -75,6 +75,7 @@ class VoiceActor(BaseAction):
     async def start(self) -> None:
         """ No background tasks to start for VoiceActor"""
         pass
+    
     async def stop(self):
         """Stop all audio channels and release models."""
         await self._cancel_speech()
