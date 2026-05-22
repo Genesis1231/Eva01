@@ -26,6 +26,7 @@ embed-all = [
 [project.scripts]
 # Run EVA directly from the command line after install:  eva
 eva = "main:main"
+eva-setup = "scripts.setup:main"
 
 [tool.pytest.ini_options]
 testpaths = ["test"]
@@ -40,4 +41,4 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["eva*", "config*"]
+include = ["eva*", "config*", "scripts*"]

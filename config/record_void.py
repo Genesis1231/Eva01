@@ -12,21 +12,19 @@ Saves to data/voices/{person_id}/sample_01.wav … sample_05.wav
 import argparse
 import sys
 import time
-from pathlib import Path
 
 import numpy as np
 import sounddevice as sd
 import soundfile as sf
-import torch
-from silero_vad import load_silero_vad, get_speech_timestamps
+
+from config import DATA_DIR
+from eva.senses.audio.vad_onnx import SileroVAD
 
 SAMPLE_RATE = 16000
 CHANNELS = 1
 MAX_RECORD_SECONDS = 12
 SILENCE_TIMEOUT = 1.5   # auto-stop after this much trailing silence
 MIN_SPEECH_SECONDS = 1.0
-
-DATA_DIR = Path(__file__).resolve().parent / "data"
 
 PROMPTS = [
     "The quick brown fox jumps over the lazy dog near the riverbank every single morning.",
@@ -37,19 +35,7 @@ PROMPTS = [
 ]
 
 
-def trim_silence(audio: np.ndarray, vad_model) -> np.ndarray:
-    """Trim leading/trailing silence using Silero VAD."""
-    tensor = torch.from_numpy(audio).float()
-    stamps = get_speech_timestamps(tensor, vad_model, sampling_rate=SAMPLE_RATE)
-    if not stamps:
-        return audio
-
-    start = max(0, stamps[0]["start"] - SAMPLE_RATE // 10)   # 100ms padding
-    end = min(len(audio), stamps[-1]["end"] + SAMPLE_RATE // 10)
-    return audio[start:end]
-
-
-def record_one(index: int, prompt: str, vad_model) -> np.ndarray | None:
+def record_one(index: int, prompt: str, vad: SileroVAD) -> np.ndarray | None:
     """Record one sample with VAD-based auto-stop."""
     print(f"\n--- Sample {index + 1}/5 ---")
     print(f"Read this aloud:\n")
@@ -59,9 +45,6 @@ def record_one(index: int, prompt: str, vad_model) -> np.ndarray | None:
     frames: list[np.ndarray] = []
     speech_detected = False
     silent_since: float | None = None
-
-    # Use a small Silero window to check speech on-the-fly
-    vad_chunk_size = 512  # Silero expects 512 samples at 16kHz (32ms)
     vad_buffer = np.zeros(0, dtype=np.float32)
 
     def callback(indata, frame_count, time_info, status):
@@ -71,14 +54,12 @@ def record_one(index: int, prompt: str, vad_model) -> np.ndarray | None:
         chunk = indata[:, 0].copy().astype(np.float32)
         frames.append(chunk)
 
-        # Accumulate for VAD
         vad_buffer = np.concatenate([vad_buffer, chunk])
-        while len(vad_buffer) >= vad_chunk_size:
-            window = torch.from_numpy(vad_buffer[:vad_chunk_size])
-            prob = vad_model(window, SAMPLE_RATE).item()
-            vad_buffer = vad_buffer[vad_chunk_size:]
+        while len(vad_buffer) >= SileroVAD.CHUNK_SIZE:
+            prob = vad.probe(vad_buffer[:SileroVAD.CHUNK_SIZE])
+            vad_buffer = vad_buffer[SileroVAD.CHUNK_SIZE:]
 
-            if prob > 0.5:
+            if prob > SileroVAD.THRESHOLD:
                 speech_detected = True
                 silent_since = None
             elif speech_detected and silent_since is None:
@@ -106,11 +87,8 @@ def record_one(index: int, prompt: str, vad_model) -> np.ndarray | None:
         return None
 
     audio = np.concatenate(frames)
-
-    # Reset VAD state for trim pass
-    vad_model.reset_states()
-    audio = trim_silence(audio, vad_model)
-    vad_model.reset_states()
+    audio = vad.trim_silence(audio)
+    vad.reset_states()
 
     duration = len(audio) / SAMPLE_RATE
     if duration < MIN_SPEECH_SECONDS:
@@ -135,7 +113,7 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
 
     print("Loading Silero VAD...")
-    vad_model = load_silero_vad()
+    vad = SileroVAD()
 
     print(f"\nRecording 5 voice samples for '{args.person_id}'")
     print(f"Saving to: {out_dir}")
@@ -143,11 +121,11 @@ def main():
 
     saved = 0
     for i, prompt in enumerate(PROMPTS):
-        audio = record_one(i, prompt, vad_model)
+        audio = record_one(i, prompt, vad)
         if audio is None:
             retry = input("  Retry? [Y/n] ").strip().lower()
             if retry != "n":
-                audio = record_one(i, prompt, vad_model)
+                audio = record_one(i, prompt, vad)
 
         if audio is not None:
             path = out_dir / f"sample_{i + 1:02d}.wav"

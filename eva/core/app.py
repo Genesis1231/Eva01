@@ -141,7 +141,7 @@ async def breathe(sense_buffer: SenseBuffer, brain: Brain) -> None:
         try:
             await brain.invoke(entry)
         except Exception as e:
-            logger.error(f"EVA: brain error — {e}")
+            logger.error(f"EVA: brain invoking error — {e}")
 
 async def wake() -> None:
     """Launch EVA — senses, mind, and voice running concurrently."""

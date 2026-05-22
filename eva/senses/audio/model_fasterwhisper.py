@@ -1,7 +1,7 @@
 from typing import List, Optional, Tuple, Union
 
+import ctranslate2
 import numpy as np
-import torch
 from faster_whisper import WhisperModel
 
 from config import logger
@@ -18,11 +18,10 @@ class FWTranscriber:
     """
 
     def __init__(self, language: str = "en") -> None:
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = "cuda" if ctranslate2.get_cuda_device_count() > 0 else "cpu"
         self.compute_type = "float16" if self.device == "cuda" else "int8"
         self.model: Optional[WhisperModel] = None
-        
-        # Handle "multilingual" or explicit language
+
         if language.upper() == "MULTILINGUAL":
             self.language = None
             self.model_name = "large-v3"
@@ -73,13 +72,8 @@ class FWTranscriber:
                 vad_parameters=dict(threshold=0.3)
             )
 
-            # Consume generator to build full text
             text = "".join(segment.text for segment in segments).strip()
-            
-            # Determine return language
-            # Use the detected language from info or the default language
-            detected_lang = (info.language[:2].lower() if info.language else self.language)
-            
+            detected_lang = info.language[:2].lower() if info.language else self.language
             return (text, detected_lang)
 
         except Exception as e:
@@ -88,13 +82,9 @@ class FWTranscriber:
 
     def close(self) -> None:
         """Explicitly release resources."""
-        if hasattr(self, 'model') and self.model:
+        if self.model:
             self.model.model.unload_model()
-            del self.model
             self.model = None
-
-        if self.device == "cuda":
-            torch.cuda.empty_cache()
 
     def __del__(self) -> None:
         self.close()
