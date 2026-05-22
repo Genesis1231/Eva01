@@ -19,7 +19,6 @@ from config import DATA_DIR
 from eva.database.db import SQLiteHandler
 from eva.core.people import PeopleDB
 from config.record_void import PROMPTS, SAMPLE_RATE, record_one
-from eva.senses.audio.vad_onnx import SileroVAD
 import soundfile as sf
 
 _IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
@@ -98,10 +97,7 @@ def _record_voice_samples(person_id: str) -> int:
     out_dir = DATA_DIR / "voices" / person_id
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    print("\nLoading Silero VAD...")
-    vad = SileroVAD()
-
-    print(f"Recording 5 voice samples for '{person_id}'")
+    print(f"\nRecording 5 voice samples for '{person_id}'")
     print(f"Saving to: {out_dir}")
 
     # Replace existing samples for deterministic enrollment.
@@ -110,11 +106,11 @@ def _record_voice_samples(person_id: str) -> int:
 
     saved = 0
     for i, prompt in enumerate(PROMPTS):
-        audio = record_one(i, prompt, vad)
+        audio = record_one(i, prompt)
         if audio is None:
             retry = input("  Retry this sample? [Y/n] ").strip().lower()
             if retry != "n":
-                audio = record_one(i, prompt, vad)
+                audio = record_one(i, prompt)
 
         if audio is not None:
             path = out_dir / f"sample_{i + 1:02d}.wav"

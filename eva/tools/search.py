@@ -2,7 +2,7 @@
 
 import re
 import asyncio
-from typing import Dict, List, Any
+from typing import Any
 from langchain_core.tools import tool
 from config import logger
 from typing import Literal
@@ -109,7 +109,7 @@ async def _search_youtube(query: str) -> str:
     return "I found some videos:\n" + "\n".join(lines)
 
 
-def _search(query: str) -> List[Dict[str, Any]]:
+def _search(query: str) -> list[dict[str, Any]]:
     """Blocking yt-dlp search — runs in a thread."""
     with yt_dlp.YoutubeDL(_YDL_OPTS) as ydl:
         results = ydl.extract_info(f"ytsearch5:{query}", download=False)

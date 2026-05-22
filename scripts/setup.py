@@ -31,15 +31,16 @@ SILERO_VAD = ModelSpec(
     sha256="1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
 )
 
-# Pin to a specific commit — hf-community's `main` branch could rewrite.
+# sherpa-onnx's tagged release — same WeSpeaker weights with `model_type`
+# metadata baked in, which sherpa_onnx.SpeakerEmbeddingExtractor requires.
 WESPEAKER_RESNET34_LM = ModelSpec(
     label="WeSpeaker ResNet34-LM",
     path=MODELS_DIR / "wespeaker_resnet34_LM.onnx",
     url=(
-        "https://huggingface.co/onnx-community/wespeaker-voxceleb-resnet34-LM/"
-        "resolve/4dc8d37dd6084f36fa713510d5b31d7666224d00/onnx/model.onnx"
+        "https://github.com/k2-fsa/sherpa-onnx/releases/download/"
+        "speaker-recongition-models/wespeaker_en_voxceleb_resnet34_LM.onnx"
     ),
-    sha256="3955447b0499dc9e0a4541a895df08b03c69098eba4e56c02b5603e9f7f4fcbb",
+    sha256="e9848563da86f263117134dfd7ad63c92355b37de492b55e325400c9d9c39012",
 )
 
 MODELS = [SILERO_VAD, WESPEAKER_RESNET34_LM]

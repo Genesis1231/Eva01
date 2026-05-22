@@ -5,7 +5,7 @@ Usage:
     python record_void.py p001
     python record_void.py p001 --list-devices
 
-Records 5 samples with Silero VAD to trim silence.
+Records 5 samples with sherpa-onnx Silero VAD to trim silence.
 Saves to data/voices/{person_id}/sample_01.wav … sample_05.wav
 """
 
@@ -14,11 +14,11 @@ import sys
 import time
 
 import numpy as np
+import sherpa_onnx
 import sounddevice as sd
 import soundfile as sf
 
 from config import DATA_DIR
-from eva.senses.audio.vad_onnx import SileroVAD
 
 SAMPLE_RATE = 16000
 CHANNELS = 1
@@ -35,12 +35,40 @@ PROMPTS = [
 ]
 
 
-def record_one(index: int, prompt: str, vad: SileroVAD) -> np.ndarray | None:
+def _build_vad() -> sherpa_onnx.VoiceActivityDetector:
+    """Construct a sherpa-onnx Silero VAD with library defaults."""
+    cfg = sherpa_onnx.VadModelConfig()
+    cfg.silero_vad.model = str(DATA_DIR / "models" / "silero_vad.onnx")
+    cfg.sample_rate = SAMPLE_RATE
+    return sherpa_onnx.VoiceActivityDetector(cfg, buffer_size_in_seconds=30)
+
+
+def _trim_with_vad(audio: np.ndarray, vad: sherpa_onnx.VoiceActivityDetector) -> np.ndarray:
+    """Concatenate detected speech segments. Returns original if VAD found nothing."""
+    vad.reset()
+    window = vad.config.silero_vad.window_size
+    buf = audio.astype(np.float32, copy=False)
+    i = 0
+    while i + window <= len(buf):
+        vad.accept_waveform(buf[i : i + window])
+        i += window
+    vad.flush()
+    speech: list[float] = []
+    while not vad.empty():
+        speech.extend(list(vad.front.samples))  # copy before pop()
+        vad.pop()
+    return np.asarray(speech, dtype=np.float32) if speech else audio
+
+
+def record_one(index: int, prompt: str) -> np.ndarray | None:
     """Record one sample with VAD-based auto-stop."""
     print(f"\n--- Sample {index + 1}/5 ---")
     print(f"Read this aloud:\n")
     print(f'  "{prompt}"\n')
     input("Press ENTER when ready, then speak... ")
+
+    vad = _build_vad()
+    window = vad.config.silero_vad.window_size
 
     frames: list[np.ndarray] = []
     speech_detected = False
@@ -55,11 +83,10 @@ def record_one(index: int, prompt: str, vad: SileroVAD) -> np.ndarray | None:
         frames.append(chunk)
 
         vad_buffer = np.concatenate([vad_buffer, chunk])
-        while len(vad_buffer) >= SileroVAD.CHUNK_SIZE:
-            prob = vad.probe(vad_buffer[:SileroVAD.CHUNK_SIZE])
-            vad_buffer = vad_buffer[SileroVAD.CHUNK_SIZE:]
-
-            if prob > SileroVAD.THRESHOLD:
+        while len(vad_buffer) >= window:
+            vad.accept_waveform(vad_buffer[:window])
+            vad_buffer = vad_buffer[window:]
+            if vad.is_speech_detected():
                 speech_detected = True
                 silent_since = None
             elif speech_detected and silent_since is None:
@@ -87,8 +114,7 @@ def record_one(index: int, prompt: str, vad: SileroVAD) -> np.ndarray | None:
         return None
 
     audio = np.concatenate(frames)
-    audio = vad.trim_silence(audio)
-    vad.reset_states()
+    audio = _trim_with_vad(audio, vad)
 
     duration = len(audio) / SAMPLE_RATE
     if duration < MIN_SPEECH_SECONDS:
@@ -112,20 +138,17 @@ def main():
     out_dir = DATA_DIR / "voices" / args.person_id
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    print("Loading Silero VAD...")
-    vad = SileroVAD()
-
     print(f"\nRecording 5 voice samples for '{args.person_id}'")
     print(f"Saving to: {out_dir}")
     print(f"Auto-stops after {SILENCE_TIMEOUT}s of silence.")
 
     saved = 0
     for i, prompt in enumerate(PROMPTS):
-        audio = record_one(i, prompt, vad)
+        audio = record_one(i, prompt)
         if audio is None:
             retry = input("  Retry? [Y/n] ").strip().lower()
             if retry != "n":
-                audio = record_one(i, prompt, vad)
+                audio = record_one(i, prompt)
 
         if audio is not None:
             path = out_dir / f"sample_{i + 1:02d}.wav"

@@ -222,8 +222,6 @@ jsonschema==4.26.0
     # via csvw
 jsonschema-specifications==2025.9.1
     # via jsonschema
-kaldi-native-fbank==1.22.3
-    # via -r requirements.in
 keras==3.12.1
     # via
     #   -r requirements.in
@@ -545,6 +543,10 @@ setuptools==82.0.1
     #   tensorflow
 shellingham==1.5.4
     # via typer
+sherpa-onnx==1.13.2
+    # via -r requirements.in
+sherpa-onnx-core==1.13.2
+    # via sherpa-onnx
 six==1.17.0
     # via
     #   astunparse
