@@ -20,6 +20,7 @@ frontend/.env.local
 .claude/
 .cursor/
 .vscode/
+.github/
 .cursorignore
 tests/
 planning/

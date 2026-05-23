@@ -25,13 +25,14 @@ class PromptConstructor:
         self.people: dict[str, Any] | None = people
 
     def build_system(
-        self, 
-        timestamp: str, 
-        memory: str = "", 
+        self,
+        timestamp: str,
+        memory: str = "",
         present_people: set[str] = set(),
+        mood_block: str = "",
     ) -> str:
         """Build the system prompt string."""
-        
+
         prompt = (
             f"<PERSONA>{self.soul}</PERSONA>\n\n"
             f"<INSTRUCTIONS>\n"
@@ -50,8 +51,11 @@ class PromptConstructor:
                 prompt += f"\n{memory}"
             prompt += "\n</MEMORY>"
 
+        if mood_block:
+            prompt += f"\n\n{mood_block}"
+
         prompt += f"\n\n<CURRENT_TIME>{timestamp}</CURRENT_TIME>\n\n"
-            
+
         # logger.debug(f"Constructed system prompt:\n{prompt}")
         return prompt
 

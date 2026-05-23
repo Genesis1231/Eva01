@@ -7,8 +7,9 @@ Graph: START → think → tool calls? → yes → tools → think
 Pure workflow topology. The Cortex owns the LLM and prompt logic.
 """
 
+import asyncio
 from datetime import datetime
-from typing import List, Dict, Annotated, TypedDict, Set 
+from typing import List, Dict, Annotated, TypedDict, Set
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, add_messages, END
@@ -25,12 +26,14 @@ from eva.agent.llm import Cortex
 from eva.agent.constructor import PromptConstructor
 from eva.core.memory import MemoryDB
 from eva.senses.sense_buffer import SenseEntry
+from eva.subconscious.mood import MoodScorer, _update_mood
 from eva.tools import load_tools, handle_tool_error
 
 
 class EvaState(TypedDict):
     messages: Annotated[List[BaseMessage], add_messages]
     present_people: Set[str]
+    mood: Annotated[List[float], _update_mood]
 
 class Brain:
     """EVA's brain graph — orchestrates agent, memory, and workflow. """
@@ -47,8 +50,9 @@ class Brain:
     ):
         self.tools = load_tools(action_buffer)
         self.cortex = Cortex(model_name=model_name, tools=self.tools)
-        self.constructor = PromptConstructor(people=people) 
+        self.constructor = PromptConstructor(people=people)
         self.memory = memory
+        self.mood_scorer = MoodScorer()
         
         self._processing = False
         self.thread_id = self._new_thread_id()
@@ -71,12 +75,13 @@ class Brain:
         """ The "think" node — EVA processes messages and decides on tool calls."""
 
         distilled, memory = await self.memory.prepare_context(state["messages"])
-        
+
         response = await self.cortex.respond(
             constructor=self.constructor,
             messages=distilled,
             present_people=state.get("present_people", set()),
             memory=memory,
+            mood=state.get("mood"),
         )
 
         return {"messages": [response]}
@@ -141,13 +146,18 @@ class Brain:
 
             message = HumanMessage(content=entry.content)
 
-            await self._graph.ainvoke(
-                EvaState(
-                    messages=[message],
-                    present_people=people_ids,
-                ),
-                config=self._config,
-            )
+            # External senses drive mood; inner-voice "thought" events
+            # are excluded — outside factors change mood, not narration.
+            state_update: dict = {
+                "messages": [message],
+                "present_people": people_ids,
+            }
+            if entry.type != "thought":
+                state_update["mood"] = await asyncio.to_thread(
+                    self.mood_scorer.score, entry.content
+                )
+
+            await self._graph.ainvoke(state_update, config=self._config)
         finally:
             self._processing = False
 
