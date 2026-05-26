@@ -7,7 +7,7 @@ readme = "README.md"
 license = { file = "LICENSE" }
 
 # Runtime dependencies are tracked in requirements.txt.
-# Install in dev mode with: pip install -e .
+# Install in dev mode with: uv pip install -e .
 dependencies = []
 
 [project.optional-dependencies]
@@ -22,6 +22,17 @@ embed-all = [
     "fastembed>=0.3.0",
     "sqlite-vec>=0.1.6",
 ]
+voice-local = [
+    "kokoro-onnx>=0.3.9",
+    "faster-whisper>=1.2.1",
+    "scipy>=1.15.3",
+]
+vision-local = [
+    "deepface>=0.0.99",
+    "keras>=3.12.1",
+    "opencv-python>=4.13.0",
+    "tensorflow>=2.20.0",
+]
 
 [project.scripts]
 # Run EVA directly from the command line after install:  eva
@@ -29,7 +40,7 @@ eva = "main:main"
 eva-setup = "scripts.setup:main"
 
 [tool.pytest.ini_options]
-testpaths = ["test"]
+testpaths = ["tests"]
 pythonpath = ["."]
 markers = [
     "live: live integration tests requiring real hardware (webcam) and API keys",

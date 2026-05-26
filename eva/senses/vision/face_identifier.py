@@ -2,7 +2,11 @@ from pathlib import Path
 from typing import List, Dict
 
 import numpy as np
-from deepface import DeepFace
+
+try:
+    from deepface import DeepFace
+except ImportError:
+    DeepFace = None
 
 from config import logger, DATA_DIR
 from eva.core.people import PeopleDB
@@ -24,6 +28,12 @@ class FaceIdentifier:
 
     def init_model(self) -> None:
         """Initialize the recognition model."""
+        if DeepFace is None:
+            raise ImportError(
+                "deepface is not installed. You must install the 'vision-local' extra: "
+                "`uv pip install -e .[vision-local]` or `uv pip install deepface`."
+            )
+
         if self._initialized:
             return
 

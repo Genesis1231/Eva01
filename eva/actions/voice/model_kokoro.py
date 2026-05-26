@@ -14,7 +14,11 @@ from typing import Optional
 
 import numpy as np
 from config import logger
-from kokoro_onnx import Kokoro
+
+try:
+    from kokoro_onnx import Kokoro
+except ImportError:
+    Kokoro = None
 
 from .audio_player import AudioPlayer
 
@@ -32,6 +36,12 @@ class KokoroSpeaker:
     """Local TTS using Kokoro (ONNX)."""
 
     def __init__(self, voice: str = "af_heart") -> None:
+        if Kokoro is None:
+            raise ImportError(
+                "kokoro-onnx is not installed. You must install the 'voice-local' extra: "
+                "`uv pip install -e .[voice-local]` or `uv pip install kokoro-onnx`."
+            )
+
         onnx_path = _MODEL_DIR / "kokoro-v1.0.onnx"
         voices_path = _MODEL_DIR / "voices-v1.0.bin"
 

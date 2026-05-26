@@ -1,8 +1,13 @@
 from typing import List, Optional, Tuple, Union
 
-import ctranslate2
+try:
+    import ctranslate2
+    from faster_whisper import WhisperModel
+except ImportError:
+    ctranslate2 = None
+    WhisperModel = None
+
 import numpy as np
-from faster_whisper import WhisperModel
 
 from config import logger
 
@@ -18,6 +23,12 @@ class FWTranscriber:
     """
 
     def __init__(self, language: str = "en") -> None:
+        if ctranslate2 is None or WhisperModel is None:
+            raise ImportError(
+                "faster-whisper is not installed. You must install the 'voice-local' extra: "
+                "`uv pip install -e .[voice-local]` or `uv pip install faster-whisper`."
+            )
+
         self.device = "cuda" if ctranslate2.get_cuda_device_count() > 0 else "cpu"
         self.compute_type = "float16" if self.device == "cuda" else "int8"
         self.model: Optional[WhisperModel] = None

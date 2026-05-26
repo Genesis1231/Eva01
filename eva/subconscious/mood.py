@@ -2,10 +2,17 @@
 
 The mood vector is a 28-dim probability distribution over the
 go_emotions label set (SamLowe/roberta-base-go_emotions-onnx). External
-sense inputs (audio, vision, tool) update it through a decay-then-EMA
-reducer attached to the LangGraph state. Inner-voice ("thought") events
-do not update mood — outside factors change mood, inner narration
-doesn't (matches human-psychology priors).
+sense inputs update it through a decay-then-EMA reducer attached to the
+LangGraph state. Inner-voice ("thought") events do not update mood —
+outside factors change mood, inner narration doesn't (matches
+human-psychology priors).
+
+Audio events additionally run through a speaker→listener appraisal
+(see :mod:`eva.subconscious._mood.appraisal`): the speaker's expressed
+emotion is redistributed across the candidates Eva is likely to feel
+as a target ("directed") or bystander ("empathic"), weighted by Eva's
+SOUL.md trait profile. Vision and tool events skip appraisal and use
+pure contagion.
 
 Inference runs directly on ``onnxruntime`` with the Rust-backed
 ``tokenizers`` library — no ``optimum`` or ``transformers`` dependency,
@@ -21,21 +28,17 @@ from __future__ import annotations
 import numpy as np
 import onnxruntime as ort
 from tokenizers import Tokenizer
+
 from config import DATA_DIR, logger
+from eva.subconscious._mood.appraisal import (
+    DIRECTED_REACTIONS,
+    EMPATHIC_REACTIONS,
+    _appraise,
+    detect_direction,
+)
+from eva.subconscious._mood.labels import GO_EMOTIONS_LABELS  # re-exported
+from eva.utils.prompt import load_prompt
 
-
-# Labels in the model's emission order — taken from config.json
-# (SamLowe/roberta-base-go_emotions-onnx). The i-th probability the
-# model emits corresponds to the i-th label here, so this list is also
-# the canonical index → name mapping for the mood vector.
-GO_EMOTIONS_LABELS: list[str] = [
-    "admiration", "amusement", "anger", "annoyance", "approval",
-    "caring", "confusion", "curiosity", "desire", "disappointment",
-    "disapproval", "disgust", "embarrassment", "excitement", "fear",
-    "gratitude", "grief", "joy", "love", "nervousness",
-    "optimism", "pride", "realization", "relief", "remorse",
-    "sadness", "surprise", "neutral",
-]
 
 # Update math
 DECAY = 0.95   # multiplicative pull toward neutral, applied every turn
@@ -70,29 +73,25 @@ def _update_mood(
     return [ALPHA * n + (1 - ALPHA) * d for d, n in zip(decayed, new_probs)]
 
 
-def _sigmoid(x: np.ndarray) -> np.ndarray:
-    # Numerically stable sigmoid (avoids overflow for large negative x).
-    return np.where(x >= 0, 1.0 / (1.0 + np.exp(-x)),
-                    np.exp(x) / (1.0 + np.exp(x)))
-
-
 class MoodScorer:
-    """go_emotions ONNX (CPU, INT8) — pure onnxruntime + tokenizers path.
+    """go_emotions ONNX (CPU, INT8) + SOUL-conditioned appraisal.
 
     Local-only: fails fast at construction if the model files aren't in
-    ``data/models/``. Mirrors the kokoro / silero_vad loader pattern.
+    ``data/models/``. The SOUL profile is computed once at init from
+    ``SOUL.md`` and reused for every audio appraisal.
     """
 
     def __init__(self) -> None:
         self._session = None
         self._tokenizer = None
-        
+        self.soul_profile: list[float] | None = None
+
         self.initialize_mood()
-        logger.debug("MoodScorer: emotions model ready.")
+        logger.debug("MoodScorer: emotions model + SOUL profile ready.")
 
     def initialize_mood(self) -> None:
-        """Explicit model loading from construction."""
-        
+        """Load ONNX model + tokenizer, then score SOUL.md as the trait profile."""
+
         if not (_ONNX_PATH.exists() and _TOKENIZER_PATH.exists()):
             raise FileNotFoundError(
                 f"go_emotions model files not in {_MODEL_DIR}. "
@@ -105,11 +104,11 @@ class MoodScorer:
         self._session = ort.InferenceSession(
             str(_ONNX_PATH),
             providers=["CPUExecutionProvider"],
-        )        
-        
-        
-    def score(self, text: str) -> list[float]:
-        """Return 28 probabilities aligned to :data:`GO_EMOTIONS_LABELS`."""
+        )
+        self.soul_profile = self._raw(load_prompt("SOUL"))
+
+    def _raw(self, text: str) -> list[float]:
+        """28 raw probabilities aligned to :data:`GO_EMOTIONS_LABELS`."""
         enc = self._tokenizer.encode(text)
         input_ids = np.asarray([enc.ids], dtype=np.int64)
         attention_mask = np.asarray([enc.attention_mask], dtype=np.int64)
@@ -117,9 +116,32 @@ class MoodScorer:
             None,
             {"input_ids": input_ids, "attention_mask": attention_mask},
         )[0][0]
-        return _sigmoid(logits).tolist()
+        return self._sigmoid(logits).tolist()
 
+    def score(self, text: str, source: str | None = None) -> list[float]:
+        """Score ``text`` with optional speaker→listener appraisal.
 
+        ``source != "audio"`` returns raw probabilities (vision/tool
+        contagion, or legacy callers like the harness with no source).
+        ``source == "audio"`` routes through the directed/empathic
+        appraisal tables; pronounless audio falls back to raw.
+        """
+        raw = self._raw(text)
+        if source != "audio":
+            return raw
+        direction = detect_direction(text)
+        if direction == "contagion":
+            return raw
+        table = DIRECTED_REACTIONS if direction == "directed" else EMPATHIC_REACTIONS
+        return _appraise(raw, table, self.soul_profile)
+
+    
+    @staticmethod
+    def _sigmoid(x: np.ndarray) -> np.ndarray:
+        # Numerically stable sigmoid (avoids overflow for large negative x).
+        return np.where(x >= 0, 1.0 / (1.0 + np.exp(-x)),
+                        np.exp(x) / (1.0 + np.exp(x)))
+    
 def render_mood(mood: list[float] | None) -> str:
     """Render mood as a compact ``<MOOD>label=N% ...</MOOD>`` block.
 

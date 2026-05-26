@@ -39,22 +39,13 @@ sqlite-vec==0.1.6
 # Audio
 edge-tts==7.2.7
 elevenlabs==2.37.0
-faster-whisper==1.2.1
-kokoro-onnx==0.3.9
 sherpa-onnx==1.13.2
 onnxruntime==1.23.2 ; sys_platform == "darwin"
 onnxruntime-gpu==1.23.2 ; sys_platform != "darwin"
 pydub==0.25.1
 python-mpv==1.0.8
-scipy==1.15.3
 sounddevice==0.5.5
 soundfile==0.13.1
-
-# Vision
-deepface==0.0.99
-keras==3.12.1
-opencv-python==4.13.0.92
-tensorflow==2.20.0
 
 # Utilities and tooling
 pytest==9.0.2

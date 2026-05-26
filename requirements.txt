@@ -2,11 +2,6 @@
 #    uv pip compile requirements.in -o requirements.txt
 -e .
     # via -r requirements.in
-absl-py==2.4.0
-    # via
-    #   keras
-    #   tensorboard
-    #   tensorflow
 aiofiles==25.1.0
     # via -r requirements.in
 aiohappyeyeballs==2.6.2
@@ -37,26 +32,10 @@ anyio==4.13.0
     #   httpx
     #   openai
     #   starlette
-astunparse==1.6.3
-    # via tensorflow
 async-timeout==5.0.1
     # via aiohttp
 attrs==26.1.0
-    # via
-    #   aiohttp
-    #   jsonschema
-    #   phonemizer-fork
-    #   referencing
-audioread==3.1.0
-    # via librosa
-av==17.0.1
-    # via faster-whisper
-babel==2.18.0
-    # via csvw
-beautifulsoup4==4.14.3
-    # via gdown
-blinker==1.9.0
-    # via flask
+    # via aiohttp
 certifi==2026.5.20
     # via
     #   edge-tts
@@ -71,38 +50,23 @@ charset-normalizer==3.4.7
     # via requests
 click==8.4.1
     # via
-    #   flask
     #   typer
     #   uvicorn
 coloredlogs==15.0.1
     # via
     #   onnxruntime
     #   onnxruntime-gpu
-colorlog==6.10.1
-    # via kokoro-onnx
-csvw==4.0.0
-    # via segments
-ctranslate2==4.7.2
-    # via faster-whisper
-decorator==5.3.1
-    # via librosa
-deepface==0.0.99
-    # via -r requirements.in
 distro==1.9.0
     # via
     #   anthropic
     #   groq
     #   openai
-dlinfo==2.0.0
-    # via phonemizer-fork
 docstring-parser==0.18.0
     # via anthropic
 edge-tts==7.2.7
     # via -r requirements.in
 elevenlabs==2.37.0
     # via -r requirements.in
-espeakng-loader==0.2.4
-    # via kokoro-onnx
 exceptiongroup==1.3.1
     # via
     #   anyio
@@ -111,57 +75,26 @@ fastapi==0.135.1
     # via -r requirements.in
 fastembed==0.8.0
     # via -r requirements.in
-faster-whisper==1.2.1
-    # via -r requirements.in
 filelock==3.29.0
-    # via
-    #   gdown
-    #   huggingface-hub
-fire==0.7.1
-    # via deepface
+    # via huggingface-hub
 firecrawl-py==4.18.1
     # via -r requirements.in
-flask==3.1.3
-    # via
-    #   deepface
-    #   flask-cors
-flask-cors==6.0.2
-    # via deepface
 flatbuffers==25.12.19
     # via
     #   onnxruntime
     #   onnxruntime-gpu
-    #   tensorflow
 frozenlist==1.8.0
     # via
     #   aiohttp
     #   aiosignal
 fsspec==2026.4.0
     # via huggingface-hub
-gast==0.7.0
-    # via tensorflow
-gdown==6.0.0
-    # via
-    #   deepface
-    #   retina-face
-google-pasta==0.2.0
-    # via tensorflow
 groq==0.37.1
     # via langchain-groq
-grpcio==1.80.0
-    # via
-    #   tensorboard
-    #   tensorflow
-gunicorn==26.0.0
-    # via deepface
 h11==0.16.0
     # via
     #   httpcore
     #   uvicorn
-h5py==3.16.0
-    # via
-    #   keras
-    #   tensorflow
 hf-xet==1.5.0
     # via huggingface-hub
 httpcore==1.0.9
@@ -184,7 +117,6 @@ httpx-sse==0.4.3
 huggingface-hub==1.16.1
     # via
     #   fastembed
-    #   faster-whisper
     #   tokenizers
 humanfriendly==10.0
     # via coloredlogs
@@ -196,39 +128,14 @@ idna==3.16
     #   yarl
 iniconfig==2.3.0
     # via pytest
-isodate==0.7.2
-    # via
-    #   csvw
-    #   rdflib
-itsdangerous==2.2.0
-    # via flask
-jinja2==3.1.6
-    # via flask
 jiter==0.15.0
     # via
     #   anthropic
     #   openai
-joblib==1.5.3
-    # via
-    #   librosa
-    #   mtcnn
-    #   phonemizer-fork
-    #   scikit-learn
 jsonpatch==1.33
     # via langchain-core
 jsonpointer==3.1.1
     # via jsonpatch
-jsonschema==4.26.0
-    # via csvw
-jsonschema-specifications==2025.9.1
-    # via jsonschema
-keras==3.12.1
-    # via
-    #   -r requirements.in
-    #   deepface
-    #   tensorflow
-kokoro-onnx==0.3.9
-    # via -r requirements.in
 langchain==1.2.10
     # via -r requirements.in
 langchain-anthropic==1.3.4
@@ -284,93 +191,33 @@ langgraph-sdk==0.3.14
     # via langgraph
 langsmith==0.8.5
     # via langchain-core
-language-tags==1.3.1
-    # via csvw
-lazy-loader==0.5
-    # via librosa
-libclang==18.1.1
-    # via tensorflow
-librosa==0.11.0
-    # via kokoro-onnx
-lightdsa==0.0.3
-    # via deepface
-lightecc==0.0.6
-    # via
-    #   lightdsa
-    #   lightphe
-lightphe==0.0.25
-    # via deepface
-llvmlite==0.47.0
-    # via numba
 loguru==0.7.3
     # via fastembed
-lz4==4.4.5
-    # via mtcnn
-markdown==3.10.2
-    # via tensorboard
 markdown-it-py==4.2.0
     # via rich
-markupsafe==3.0.3
-    # via
-    #   flask
-    #   jinja2
-    #   werkzeug
 mdurl==0.1.2
     # via markdown-it-py
-ml-dtypes==0.5.4
-    # via
-    #   keras
-    #   tensorflow
 mmh3==5.2.1
     # via fastembed
 mpmath==1.3.0
     # via sympy
-msgpack==1.1.2
-    # via librosa
-mtcnn==1.0.0
-    # via deepface
 multidict==6.7.1
     # via
     #   aiohttp
     #   yarl
-namex==0.1.0
-    # via keras
 nest-asyncio==1.6.0
     # via firecrawl-py
-numba==0.65.1
-    # via
-    #   kokoro-onnx
-    #   librosa
 numpy==2.2.6
     # via
     #   -r requirements.in
-    #   ctranslate2
-    #   deepface
     #   fastembed
-    #   h5py
-    #   keras
-    #   kokoro-onnx
-    #   librosa
-    #   ml-dtypes
-    #   numba
     #   onnxruntime
     #   onnxruntime-gpu
-    #   opencv-python
-    #   pandas
-    #   retina-face
-    #   scikit-learn
-    #   scipy
     #   soundfile
-    #   soxr
-    #   tensorboard
-    #   tensorflow
 ollama==0.6.2
     # via langchain-ollama
 onnxruntime==1.23.2
-    # via
-    #   fastembed
-    #   faster-whisper
-    #   kokoro-onnx
+    # via fastembed
 onnxruntime-gpu==1.23.2
     # via -r requirements.in
 openai==2.26.0
@@ -378,15 +225,6 @@ openai==2.26.0
     #   -r requirements.in
     #   langchain-openai
     #   langchain-perplexity
-opencv-python==4.13.0.92
-    # via
-    #   -r requirements.in
-    #   deepface
-    #   retina-face
-opt-einsum==3.4.0
-    # via tensorflow
-optree==0.19.1
-    # via keras
 orjson==3.11.9
     # via
     #   langgraph-sdk
@@ -395,35 +233,16 @@ ormsgpack==1.12.2
     # via langgraph-checkpoint
 packaging==26.2
     # via
-    #   gunicorn
     #   huggingface-hub
-    #   keras
     #   langchain-core
     #   langsmith
-    #   lazy-loader
     #   onnxruntime
     #   onnxruntime-gpu
-    #   pooch
     #   pytest
-    #   tensorboard
-    #   tensorflow
-    #   wheel
-pandas==2.3.3
-    # via deepface
-phonemizer-fork==3.3.1
-    # via kokoro-onnx
 pillow==12.2.0
-    # via
-    #   deepface
-    #   fastembed
-    #   retina-face
-    #   tensorboard
-platformdirs==4.9.6
-    # via pooch
+    # via fastembed
 pluggy==1.6.0
     # via pytest
-pooch==1.9.0
-    # via librosa
 propcache==0.5.2
     # via
     #   aiohttp
@@ -432,8 +251,6 @@ protobuf==7.35.0
     # via
     #   onnxruntime
     #   onnxruntime-gpu
-    #   tensorboard
-    #   tensorflow
 py-rust-stemmers==0.1.5
     # via fastembed
 pycparser==3.0
@@ -464,95 +281,41 @@ pygments==2.20.0
     # via
     #   pytest
     #   rich
-pyparsing==3.3.2
-    # via rdflib
-pysocks==1.7.1
-    # via requests
 pytest==9.0.2
     # via -r requirements.in
-python-dateutil==2.9.0.post0
-    # via
-    #   csvw
-    #   pandas
 python-dotenv==1.2.1
     # via
     #   -r requirements.in
-    #   deepface
     #   firecrawl-py
 python-mpv==1.0.8
     # via -r requirements.in
-pytz==2026.2
-    # via pandas
 pyyaml==6.0.3
     # via
     #   -r requirements.in
-    #   ctranslate2
     #   huggingface-hub
     #   langchain-core
-rdflib==7.6.0
-    # via csvw
-referencing==0.37.0
-    # via
-    #   jsonschema
-    #   jsonschema-specifications
 regex==2026.5.9
-    # via
-    #   segments
-    #   tiktoken
+    # via tiktoken
 requests==2.34.2
     # via
-    #   deepface
     #   elevenlabs
     #   fastembed
     #   firecrawl-py
-    #   gdown
     #   langchain-xai
     #   langsmith
-    #   pooch
     #   requests-toolbelt
     #   tavily-python
-    #   tensorflow
     #   tiktoken
 requests-toolbelt==1.0.0
     # via langsmith
-retina-face==0.0.17
-    # via deepface
-rfc3986==1.5.0
-    # via csvw
 rich==15.0.0
-    # via
-    #   keras
-    #   typer
-rpds-py==0.30.0
-    # via
-    #   jsonschema
-    #   referencing
-scikit-learn==1.7.2
-    # via librosa
-scipy==1.15.3
-    # via
-    #   -r requirements.in
-    #   librosa
-    #   scikit-learn
-segments==2.4.0
-    # via phonemizer-fork
-setuptools==82.0.1
-    # via
-    #   ctranslate2
-    #   tensorboard
-    #   tensorflow
+    # via typer
 shellingham==1.5.4
     # via typer
 sherpa-onnx==1.13.2
     # via -r requirements.in
 sherpa-onnx-core==1.13.2
     # via sherpa-onnx
-six==1.17.0
-    # via
-    #   astunparse
-    #   google-pasta
-    #   python-dateutil
-    #   tensorflow
 sniffio==1.3.1
     # via
     #   anthropic
@@ -561,13 +324,7 @@ sniffio==1.3.1
 sounddevice==0.5.5
     # via -r requirements.in
 soundfile==0.13.1
-    # via
-    #   -r requirements.in
-    #   librosa
-soupsieve==2.8.3
-    # via beautifulsoup4
-soxr==1.1.0
-    # via librosa
+    # via -r requirements.in
 sqlite-vec==0.1.6
     # via
     #   -r requirements.in
@@ -576,8 +333,6 @@ starlette==1.0.1
     # via fastapi
 sympy==1.14.0
     # via
-    #   lightdsa
-    #   lightphe
     #   onnxruntime
     #   onnxruntime-gpu
 tabulate==0.9.0
@@ -588,22 +343,6 @@ tavily-python==0.7.23
     # via -r requirements.in
 tenacity==9.1.4
     # via langchain-core
-tensorboard==2.20.0
-    # via tensorflow
-tensorboard-data-server==0.7.2
-    # via tensorboard
-tensorflow==2.20.0
-    # via
-    #   -r requirements.in
-    #   deepface
-    #   retina-face
-termcolor==3.3.0
-    # via
-    #   csvw
-    #   fire
-    #   tensorflow
-threadpoolctl==3.6.0
-    # via scikit-learn
 tiktoken==0.13.0
     # via
     #   langchain-openai
@@ -611,20 +350,13 @@ tiktoken==0.13.0
 tokenizers==0.23.1
     # via
     #   fastembed
-    #   faster-whisper
     #   langchain-mistralai
 tomli==2.4.1
     # via pytest
 tqdm==4.67.3
     # via
-    #   deepface
     #   fastembed
-    #   faster-whisper
-    #   gdown
     #   huggingface-hub
-    #   lightdsa
-    #   lightecc
-    #   lightphe
     #   openai
 typer==0.25.1
     # via huggingface-hub
@@ -633,36 +365,24 @@ typing-extensions==4.15.0
     #   aiosignal
     #   anthropic
     #   anyio
-    #   beautifulsoup4
     #   edge-tts
     #   elevenlabs
     #   exceptiongroup
     #   fastapi
-    #   gdown
     #   groq
-    #   grpcio
     #   huggingface-hub
     #   langchain-core
-    #   librosa
     #   multidict
     #   openai
-    #   optree
-    #   phonemizer-fork
     #   pydantic
     #   pydantic-core
-    #   referencing
     #   starlette
-    #   tensorflow
     #   typing-inspection
     #   uvicorn
 typing-inspection==0.4.2
     # via
     #   fastapi
     #   pydantic
-tzdata==2026.2
-    # via pandas
-uritemplate==4.2.0
-    # via csvw
 urllib3==2.7.0
     # via requests
 uuid-utils==0.16.0
@@ -675,15 +395,6 @@ websockets==16.0
     # via
     #   elevenlabs
     #   firecrawl-py
-werkzeug==3.1.8
-    # via
-    #   flask
-    #   flask-cors
-    #   tensorboard
-wheel==0.47.0
-    # via astunparse
-wrapt==2.2.0
-    # via tensorflow
 xxhash==3.7.0
     # via
     #   langgraph

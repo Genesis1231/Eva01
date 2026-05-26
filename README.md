@@ -118,19 +118,26 @@ These aren't scripted behaviors. They're scoring functions that compete for her 
 
 ### Install 
 
+We recommend using [uv](https://github.com/astral-sh/uv) for lightning-fast dependency management.
+
 ```bash
 git clone https://github.com/Genesis1231/Eva01.git
 cd Eva01
 
-python3 -m venv .venv
-source .venv/bin/activate
-
 # System deps
-# CUDA(if running local): https://developer.nvidia.com/cuda-downloads
+# CUDA (if running local): https://developer.nvidia.com/cuda-downloads
 sudo apt-get install -y ffmpeg
 
-# Python deps
-pip install -r requirements.txt
+# Create venv and install dependencies
+uv venv
+source .venv/bin/activate
+
+# Choose your stack:
+# 1. Base (Online/API only - Slim)
+uv pip install -e .
+
+# 2. Local AI (Voice/Vision - Heavy)
+# uv pip install -e .[voice-local,vision-local]
 ```
 
 ### ⚙️ Configure 

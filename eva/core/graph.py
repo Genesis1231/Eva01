@@ -154,7 +154,7 @@ class Brain:
             }
             if entry.type != "thought":
                 state_update["mood"] = await asyncio.to_thread(
-                    self.mood_scorer.score, entry.content
+                    self.mood_scorer.score, entry.content, entry.type
                 )
 
             await self._graph.ainvoke(state_update, config=self._config)
