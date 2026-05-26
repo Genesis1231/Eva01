@@ -1,5 +1,5 @@
-CLAUDE.md
 .env
+.gitignore
 !.env.example
 
 # Python
@@ -16,12 +16,13 @@ frontend/
 **/dist/
 frontend/.env.local
 
-# Project Specific
+# IDE & Coding Tools
+CLAUDE.md
+AGENTS.md
 .claude/
-.cursor/
 .vscode/
-.github/
-.cursorignore
+
+# Project Specific
 tests/
 planning/
 test/
@@ -33,7 +34,6 @@ planning/
 *.wav
 *.mp3
 *.db
-*.bak
 *.jpg
 
 # OS

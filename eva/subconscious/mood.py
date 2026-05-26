@@ -19,7 +19,8 @@ Rendering for the system prompt is :func:`render_mood`.
 from __future__ import annotations
 
 import numpy as np
-
+import onnxruntime as ort
+from tokenizers import Tokenizer
 from config import DATA_DIR, logger
 
 
@@ -83,25 +84,30 @@ class MoodScorer:
     """
 
     def __init__(self) -> None:
+        self._session = None
+        self._tokenizer = None
+        
+        self.initialize_mood()
+        logger.debug("MoodScorer: emotions model ready.")
+
+    def initialize_mood(self) -> None:
+        """Explicit model loading from construction."""
+        
         if not (_ONNX_PATH.exists() and _TOKENIZER_PATH.exists()):
             raise FileNotFoundError(
                 f"go_emotions model files not in {_MODEL_DIR}. "
                 "Run snapshot_download for "
                 "SamLowe/roberta-base-go_emotions-onnx into data/models/."
             )
-        # Imported lazily — both libs are small but only relevant if
-        # mood scoring is actually used.
-        import onnxruntime as ort
-        from tokenizers import Tokenizer
 
         self._tokenizer = Tokenizer.from_file(str(_TOKENIZER_PATH))
         self._tokenizer.enable_truncation(max_length=_MAX_TOKENS)
         self._session = ort.InferenceSession(
             str(_ONNX_PATH),
             providers=["CPUExecutionProvider"],
-        )
-        logger.debug("MoodScorer: go_emotions ONNX ready.")
-
+        )        
+        
+        
     def score(self, text: str) -> list[float]:
         """Return 28 probabilities aligned to :data:`GO_EMOTIONS_LABELS`."""
         enc = self._tokenizer.encode(text)

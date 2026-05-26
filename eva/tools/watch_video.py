@@ -16,7 +16,7 @@ import yt_dlp
 from config import logger, eva_configuration as config
 from eva.tools import ToolError
 from eva.utils.prompt import load_prompt
-from eva.utils.video_analyzer import VideoAnalyzer
+from eva.tools._shared.video_analyzer import VideoAnalyzer
 
 _MAX_VIDEO_DURATION = 900  # 15 minutes — beyond this, use transcript
 _analyzer: VideoAnalyzer | None = None

@@ -25,7 +25,7 @@ class Transcriber:
         }
         
     def _create_fasterwhisper_model(self):
-        from eva.senses.audio.model_fasterwhisper import FWTranscriber
+        from .models.model_fasterwhisper import FWTranscriber
         
         try:
             return FWTranscriber()
@@ -34,7 +34,7 @@ class Transcriber:
             raise 
         
     def _create_whisper_model(self):
-        from eva.senses.audio.model_whisper import WhisperTranscriber
+        from .models.model_whisper import WhisperTranscriber
         
         try:
             return WhisperTranscriber()
