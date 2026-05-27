@@ -201,11 +201,11 @@ models:
 🆓 Setup for *completely free* if you have a decent GPU:
 ```yaml
 models:
-  main: "ollama:qwen3"
-  vision: "ollama:llava"
+  main: "ollama:qwen3.5-27b"
+  vision: "ollama:gemma4"
   stt: "faster-whisper"
   tts: "kokoro"
-  utility: "ollama:llama3.1"
+  utility: "ollama:qwen3-8b"
 ```
 ### ▶️ Run 
 
