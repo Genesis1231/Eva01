@@ -13,12 +13,14 @@ from pydub import AudioSegment
 from typing import Optional
 
 import numpy as np
+import onnxruntime as ort
 from config import logger
 
-try:
+try:    
     from kokoro_onnx import Kokoro
 except ImportError:
     Kokoro = None
+
 
 from .audio_player import AudioPlayer
 
@@ -47,10 +49,17 @@ class KokoroSpeaker:
 
         if not onnx_path.exists() or not voices_path.exists():
             raise FileNotFoundError(f"Kokoro model files not found in {_MODEL_DIR}. ")
-        
+
+        # kokoro-onnx's GPU auto-detect is broken (find_spec("onnxruntime-gpu")
+        # always returns None), so build the session ourselves with CUDA
+        # preferred and CPU as fallback.
         self.voice = voice
         self.audio_player = AudioPlayer()
-        self._model = Kokoro(str(onnx_path), str(voices_path))
+        session = ort.InferenceSession(
+            str(onnx_path),
+            providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
+        )
+        self._model = Kokoro.from_session(session, str(voices_path))
 
     def _get_language(self, language: Optional[str]) -> str:
         return _LANG_MAP.get(language or "en", "en-us") if language else "en-us"

@@ -14,16 +14,7 @@ as a target ("directed") or bystander ("empathic"), weighted by Eva's
 SOUL.md trait profile. Vision and tool events skip appraisal and use
 pure contagion.
 
-Inference runs directly on ``onnxruntime`` with the Rust-backed
-``tokenizers`` library — no ``optimum`` or ``transformers`` dependency,
-avoiding the ~500MB torch / sentencepiece chain. Total runtime cost is
-the ONNX session + ~10MB Rust tokenizer.
-
-The state lives at :attr:`EvaState.mood` in :mod:`eva.core.graph`.
-Rendering for the system prompt is :func:`render_mood`.
 """
-
-from __future__ import annotations
 
 import numpy as np
 import onnxruntime as ort
@@ -46,11 +37,7 @@ ALPHA = 0.2    # responsiveness to new event (EMA weight)
 
 # Rendering thresholds
 RENDER_THRESHOLD = 0.10   # skip labels below this in the <MOOD> block
-RENDER_TOP_K = 5          # cap on labels surfaced per render
-
-# Inference limits — mirrors the previous transformers pipeline call
-# (truncation=True, max_length=256).
-_MAX_TOKENS = 256
+RENDER_TOP_K = 3          # cap on labels surfaced per render
 
 _MODEL_DIR = DATA_DIR / "models"
 _ONNX_PATH = _MODEL_DIR / "onnx" / "model_quantized.onnx"
@@ -84,9 +71,9 @@ class MoodScorer:
     def __init__(self) -> None:
         self._session = None
         self._tokenizer = None
-        self.soul_profile: list[float] | None = None
-
+       
         self.initialize_mood()
+        self.soul_profile: list[float] = self.initialize_soul()
         logger.debug("MoodScorer: emotions model + SOUL profile ready.")
 
     def initialize_mood(self) -> None:
@@ -100,32 +87,36 @@ class MoodScorer:
             )
 
         self._tokenizer = Tokenizer.from_file(str(_TOKENIZER_PATH))
-        self._tokenizer.enable_truncation(max_length=_MAX_TOKENS)
+        self._tokenizer.enable_truncation(max_length=256)
         self._session = ort.InferenceSession(
             str(_ONNX_PATH),
             providers=["CPUExecutionProvider"],
         )
-        self.soul_profile = self._raw(load_prompt("SOUL"))
+    
+    def initialize_soul(self) -> list[float]:
+        return self._raw(load_prompt("SOUL"))
 
     def _raw(self, text: str) -> list[float]:
         """28 raw probabilities aligned to :data:`GO_EMOTIONS_LABELS`."""
+        
+        if not self._session or not self._tokenizer:
+            logger.error("MoodScorer: model not initialized, cannot score mood.")
+            return [0.0] * len(GO_EMOTIONS_LABELS)
+        
         enc = self._tokenizer.encode(text)
         input_ids = np.asarray([enc.ids], dtype=np.int64)
         attention_mask = np.asarray([enc.attention_mask], dtype=np.int64)
         logits = self._session.run(
             None,
-            {"input_ids": input_ids, "attention_mask": attention_mask},
+            {
+                "input_ids": input_ids, 
+                "attention_mask": attention_mask
+            },
         )[0][0]
         return self._sigmoid(logits).tolist()
 
     def score(self, text: str, source: str | None = None) -> list[float]:
-        """Score ``text`` with optional speaker→listener appraisal.
-
-        ``source != "audio"`` returns raw probabilities (vision/tool
-        contagion, or legacy callers like the harness with no source).
-        ``source == "audio"`` routes through the directed/empathic
-        appraisal tables; pronounless audio falls back to raw.
-        """
+        """Score ``text`` with optional speaker→listener appraisal. """
         raw = self._raw(text)
         if source != "audio":
             return raw
