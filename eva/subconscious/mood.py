@@ -7,13 +7,6 @@ LangGraph state. Inner-voice ("thought") events do not update mood —
 outside factors change mood, inner narration doesn't (matches
 human-psychology priors).
 
-Audio events additionally run through a speaker→listener appraisal
-(see :mod:`eva.subconscious._mood.appraisal`): the speaker's expressed
-emotion is redistributed across the candidates Eva is likely to feel
-as a target ("directed") or bystander ("empathic"), weighted by Eva's
-SOUL.md trait profile. Vision and tool events skip appraisal and use
-pure contagion.
-
 """
 
 import numpy as np
@@ -48,12 +41,7 @@ def _update_mood(
     prior: list[float] | None,
     new_probs: list[float],
 ) -> list[float]:
-    """LangGraph reducer: decay prior toward zero, then EMA-blend new event.
-
-    First event (no prior) is taken verbatim. Subsequent events nudge the
-    running probabilities; quiet periods (between events) don't decay
-    here — that's deferred to a future maintenance heartbeat tick.
-    """
+    """LangGraph reducer: decay prior toward zero, then EMA-blend new event.  """
     if not prior:
         return list(new_probs)
     decayed = [p * DECAY for p in prior]
@@ -61,12 +49,7 @@ def _update_mood(
 
 
 class MoodScorer:
-    """go_emotions ONNX (CPU, INT8) + SOUL-conditioned appraisal.
-
-    Local-only: fails fast at construction if the model files aren't in
-    ``data/models/``. The SOUL profile is computed once at init from
-    ``SOUL.md`` and reused for every audio appraisal.
-    """
+    """go_emotions mood score + SOUL-conditioned appraisal.  """
 
     def __init__(self) -> None:
         self._session = None

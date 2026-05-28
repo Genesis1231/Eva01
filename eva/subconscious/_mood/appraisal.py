@@ -28,8 +28,7 @@ from eva.subconscious._mood.labels import GO_EMOTIONS_LABELS, LABEL_INDEX
 # speaker metadata from AudioSense when available (see Experiment doc §8).
 _YOU_RE = re.compile(r"\byou(?:'?(?:re|ve|ll|d|rs))?\b|\byour\b", re.I)
 _SELF_RE = re.compile(r"\bI(?:'?(?:m|ve|ll|d))?\b|\b(?:me|my|mine)\b", re.I)
-# Strip interjections that contain "my" before self-check, so "OH MY GOD
-# that was amazing" doesn't get mistaken for first-person expression.
+
 _INTERJECTION_RE = re.compile(
     r"\boh+\s+my(\s+(?:god|goodness|gosh|lord|word))?\b", re.I,
 )
