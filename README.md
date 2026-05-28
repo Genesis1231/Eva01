@@ -109,6 +109,20 @@ Human behavior is often driven by impulses we can’t fully explain. Eva01 won�
 
 These aren't scripted behaviors. They're scoring functions that compete for her attention, and whichever drive is most unsatisfied generates the next self-directed action. Eva01 decides what to do with her time. Not you.
 
+### 💗 Mood: A Felt Inner State
+
+Human mood is the slow-moving affective baseline beneath thought: diffuse, persistent, shaped by what has happened, and colouring what comes next (Russell, 2003). Eva's mood is built on the same principle: a running state shaped by what she encounters, slow to change, present in everything she thinks afterward.
+
+Under the hood, it is a 28-dim probability distribution over [GoEmotions](https://huggingface.co/SamLowe/roberta-base-go_emotions-onnx), updated by every external sense input through a decay-then-EMA reducer. 
+
+Eva first scores what the *speaker* expressed, then translates that into her own felt response through a **speaker→listener appraisal** layer (Lazarus, 1991):
+
+1. **Direction detection.** A pronoun heuristic routes the input as *directed* (Eva is the target), *empathic* (Eva is bystander), or pure contagion.
+2. **Possibility clusters.** Two psychology-grounded tables (`DIRECTED`, `EMPATHIC`) map each source emotion to candidate listener reactions. 
+3. **SOUL-weighted redistribution.** `SOUL.md` is scored at init into Eva's trait profile, her baseline temperament. It weights which candidate within each cluster actually surfaces, so the same stimulus lands as *her* unique reaction.
+
+Finally, the Cortex renders the vector as a compact `<MOOD label=N%>` block in her mind.
+
 ## 🚀 Quick Start 
 
 ### Requirements
