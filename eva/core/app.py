@@ -6,6 +6,8 @@ Three concurrent components sharing two buffers:
 """
 
 import asyncio
+from dataclasses import dataclass
+
 from dotenv import load_dotenv
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from config import logger, eva_configuration, DATA_DIR, Config
@@ -34,12 +36,24 @@ from eva.actions.system import MotorSystem
 from eva.actions.voice.speaker import Speaker
 
 
+@dataclass(frozen=True, slots=True)
+class Assembly:
+    """Every component wake() needs to run and tear down. Returned by assemble()."""
+    sense_buffer: SenseBuffer
+    action_buffer: ActionBuffer
+    brain: Brain
+    heart: Heart
+    motor_system: MotorSystem
+    audio_sense: AudioSense
+    camera_sense: CameraSense | None = None
+
+
 async def assemble(
-    config: Config, 
-    db: SQLiteHandler, 
-    checkpointer: AsyncSqliteSaver | None = None
-):
-    """Wire up senses, brain, and actions. Return shared buffers and components."""
+    config: Config,
+    db: SQLiteHandler,
+    checkpointer: AsyncSqliteSaver | None = None,
+) -> Assembly:
+    """Wire up senses, brain, and actions. Return the full Assembly."""
 
     logger.debug("Assembling EVA's core components...")
     loop = asyncio.get_running_loop()
@@ -129,7 +143,15 @@ async def assemble(
     # Heartbeat
     heart = Heart(sense_buffer, task_db, config.HEARTBEAT_INTERVAL, is_busy=brain.is_busy)
 
-    return sense_buffer, action_buffer, motor_system, audio_sense, camera_sense, brain, heart
+    return Assembly(
+        sense_buffer=sense_buffer,
+        action_buffer=action_buffer,
+        brain=brain,
+        heart=heart,
+        motor_system=motor_system,
+        audio_sense=audio_sense,
+        camera_sense=camera_sense,
+    )
 
 
 async def breathe(sense_buffer: SenseBuffer, brain: Brain) -> None:
@@ -154,30 +176,30 @@ async def wake() -> None:
     eva_db = SQLiteHandler()
 
     async with AsyncSqliteSaver.from_conn_string(str(graph_db)) as checkpointer:
-        sense_buffer, action_buffer, motor_system, audio_sense, camera_sense, brain, heart = await assemble(
-            config=eva_configuration, 
-            db=eva_db, 
-            checkpointer=checkpointer
+        eva = await assemble(
+            config=eva_configuration,
+            db=eva_db,
+            checkpointer=checkpointer,
         )
 
         try:
-            await motor_system.start()
+            await eva.motor_system.start()
             await asyncio.gather(
-                heart.start(),
-                breathe(sense_buffer, brain),
-                action_buffer.start_loop(),
+                eva.heart.start(),
+                breathe(eva.sense_buffer, eva.brain),
+                eva.action_buffer.start_loop(),
             )
         except (KeyboardInterrupt, asyncio.CancelledError):
             pass
         finally:
-            await brain.shutdown()  
+            await eva.brain.shutdown()
 
-            audio_sense.stop()
-            if camera_sense is not None:
-                await camera_sense.stop()
-                
-            await motor_system.shutdown()
-            await action_buffer.stop()
+            eva.audio_sense.stop()
+            if eva.camera_sense is not None:
+                await eva.camera_sense.stop()
+
+            await eva.motor_system.shutdown()
+            await eva.action_buffer.stop()
             await eva_db.close_all()
 
 if __name__ == "__main__":

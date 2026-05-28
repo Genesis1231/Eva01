@@ -52,7 +52,6 @@ class KokoroSpeaker:
 
         # kokoro-onnx's GPU auto-detect is broken (find_spec("onnxruntime-gpu")
         # always returns None), so build the session ourselves with CUDA
-        # preferred and CPU as fallback.
         self.voice = voice
         self.audio_player = AudioPlayer()
         session = ort.InferenceSession(
