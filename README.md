@@ -10,7 +10,7 @@ She's not an assistant. She *lives*.
 
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![GitHub Stars](https://img.shields.io/github/stars/Genesis1231/EVA)](https://github.com/Genesis1231/EVA/stargazers)
+[![GitHub Stars](https://img.shields.io/github/stars/Genesis1231/Eva01)](https://github.com/Genesis1231/EVA/stargazers)
 
 
 </div>

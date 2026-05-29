@@ -55,6 +55,11 @@ _SECOND_PERSON_DISCOURSE_RE = re.compile(
 
 def detect_direction(text: str) -> str:
     """Return 'directed', 'empathic', or 'contagion' from text cues."""
+    
+    _, separator, utterance = text.partition(":")
+    if separator:
+        # strip "Adam said:" 
+        text = utterance.strip()
     text = _SECOND_PERSON_DISCOURSE_RE.sub("", text)
     if (
         _YOU_RE.search(text)
@@ -105,7 +110,7 @@ EMPATHIC_REACTIONS: dict[str, set[str]] = {
 # Speaker is acting on Eva — Eva is the target.
 # Praise → pride/joy bouquet (Algoe 2008); criticism → fear/remorse
 # with reactance candidates (Van Kleef 2009 EASI). DIRECTED gratitude
-# includes embarrassment for the Chinese 客气 reflex (Brown & Levinson
+# includes embarrassment reflex (Brown & Levinson
 # politeness theory — face-saving response to effusive thanks).
 DIRECTED_REACTIONS: dict[str, set[str]] = {
     "admiration":     {"pride", "joy", "love", "gratitude", "embarrassment"},
@@ -159,6 +164,5 @@ def _appraise(
             continue
         for c, w in zip(candidates, weights):
             out[LABEL_INDEX[c]] += p * (w / total)
-    # Multiple high-mass sources can fan into the same SOUL-favored
-    # target; cap per-label intensity at 1.0 (saturated).
+
     return [min(1.0, v) for v in out]

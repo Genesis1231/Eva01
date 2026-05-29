@@ -27,7 +27,6 @@ from eva.utils.prompt import load_prompt
 # Update math
 DECAY = 0.95   # multiplicative pull toward neutral, applied every turn
 ALPHA = 0.2    # responsiveness to new event (EMA weight)
-INITIAL_MOOD = tuple(0.0 for _ in GO_EMOTIONS_LABELS)
 
 # Rendering thresholds
 RENDER_THRESHOLD = 0.10   # skip labels below this in the <MOOD> block
@@ -43,8 +42,11 @@ def _update_mood(
     new_probs: list[float],
 ) -> list[float]:
     """LangGraph reducer: decay prior toward zero, then EMA-blend new event."""
+    
     if not prior:
-        prior = INITIAL_MOOD
+        # initial mood is flat/neutral 
+        prior = [0.0 for _ in GO_EMOTIONS_LABELS]
+        
     decayed = [p * DECAY for p in prior]
     return [ALPHA * n + (1 - ALPHA) * d for d, n in zip(decayed, new_probs)]
 
@@ -53,12 +55,9 @@ class MoodScorer:
     """go_emotions mood score + SOUL-conditioned appraisal.  """
 
     def __init__(self) -> None:
-        self._session = None
-        self._tokenizer = None
-       
         self.initialize_mood()
         self.soul_profile: list[float] = self.initialize_soul()
-        logger.debug("MoodScorer: emotions model + SOUL profile ready.")
+        logger.debug("MoodScorer: emotions model ready.")
 
     def initialize_mood(self) -> None:
         """Load ONNX model + tokenizer, then score SOUL.md as the trait profile."""
@@ -70,37 +69,37 @@ class MoodScorer:
                 "SamLowe/roberta-base-go_emotions-onnx into data/models/."
             )
 
-        self._tokenizer = Tokenizer.from_file(str(_TOKENIZER_PATH))
-        self._tokenizer.enable_truncation(max_length=256)
-        self._session = ort.InferenceSession(
-            str(_ONNX_PATH),
-            providers=["CPUExecutionProvider"],
-        )
+        try:
+            self._tokenizer = Tokenizer.from_file(str(_TOKENIZER_PATH))
+            self._tokenizer.enable_truncation(max_length=256)
+            self._session = ort.InferenceSession(
+                str(_ONNX_PATH),
+                providers=["CPUExecutionProvider"],
+            )
+        except Exception as e:
+            logger.error(f"MoodScorer: failed to initialize model - {e}")
+            raise RuntimeError(f"MoodScorer initialization failed. {e}") 
     
     def initialize_soul(self) -> list[float]:
+        """ Score SOUL.md to get the initial trait profile"""
         return self._raw(load_prompt("SOUL"))
 
     def _raw(self, text: str) -> list[float]:
         """28 raw probabilities aligned to :data:`GO_EMOTIONS_LABELS`."""
-        
-        if not self._session or not self._tokenizer:
-            logger.error("MoodScorer: model not initialized, cannot score mood.")
-            return [0.0] * len(GO_EMOTIONS_LABELS)
-        
+
         enc = self._tokenizer.encode(text)
         input_ids = np.asarray([enc.ids], dtype=np.int64)
         attention_mask = np.asarray([enc.attention_mask], dtype=np.int64)
-        logits = self._session.run(
-            None,
-            {
-                "input_ids": input_ids, 
-                "attention_mask": attention_mask
-            },
-        )[0][0]
+        outputs = self._session.run(None, {
+            "input_ids": input_ids, 
+            "attention_mask": attention_mask
+        })
+        logits = np.asarray(outputs[0])[0]
         return self._sigmoid(logits).tolist()
 
     def score(self, text: str, source: str | None = None) -> list[float]:
         """Score ``text`` with optional speaker→listener appraisal. """
+        
         raw = self._raw(text)
         if source != "audio":
             return raw
