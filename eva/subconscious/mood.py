@@ -27,6 +27,7 @@ from eva.utils.prompt import load_prompt
 # Update math
 DECAY = 0.95   # multiplicative pull toward neutral, applied every turn
 ALPHA = 0.2    # responsiveness to new event (EMA weight)
+INITIAL_MOOD = tuple(0.0 for _ in GO_EMOTIONS_LABELS)
 
 # Rendering thresholds
 RENDER_THRESHOLD = 0.10   # skip labels below this in the <MOOD> block
@@ -41,9 +42,9 @@ def _update_mood(
     prior: list[float] | None,
     new_probs: list[float],
 ) -> list[float]:
-    """LangGraph reducer: decay prior toward zero, then EMA-blend new event.  """
+    """LangGraph reducer: decay prior toward zero, then EMA-blend new event."""
     if not prior:
-        return list(new_probs)
+        prior = INITIAL_MOOD
     decayed = [p * DECAY for p in prior]
     return [ALPHA * n + (1 - ALPHA) * d for d, n in zip(decayed, new_probs)]
 

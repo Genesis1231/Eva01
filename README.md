@@ -95,13 +95,12 @@ The subconscious is the key innovation. Most AI agents fire the full LLM at ever
 
 Human mood is the slow-moving affective baseline beneath thought: diffuse, persistent, shaped by what has happened, and colouring what comes next (Russell, 2003). Eva's mood is built on the same principle: a running state shaped by what she encounters, slow to change, present in everything she thinks afterward.
 
-Under the hood, it is a 28-dim probability distribution over [GoEmotions](https://huggingface.co/SamLowe/roberta-base-go_emotions-onnx), updated by every external sense input through a decay-then-EMA reducer. 
+Under the hood, Eva's mood is a 28-dim probability distribution over [GoEmotions](https://huggingface.co/SamLowe/roberta-base-go_emotions-onnx), updated by every external sense input through a decay-then-EMA reducer. 
 
 Eva first scores what the *speaker* expressed, then translates that into her own felt response through a **speaker→listener appraisal** layer (Lazarus, 1991):
 
-1. **Direction detection.** A pronoun heuristic routes the input as *directed* (Eva is the target), *empathic* (Eva is bystander), or pure contagion.
-2. **Possibility clusters.** Two psychology-grounded tables (`DIRECTED`, `EMPATHIC`) map each source emotion to candidate listener reactions. 
-3. **SOUL-weighted redistribution.** `SOUL.md` is scored at init into Eva's trait profile, her baseline temperament. It weights which candidate within each cluster actually surfaces, so the same stimulus lands as *her* unique reaction.
+- **Reaction calculation.** A pronoun heuristic classifies input as directed, empathic, or contagion, then psychology-grounded (`DIRECTED`, `EMPATHIC`) map each source emotion to candidate listener reactions. 
+- **SOUL-weighted redistribution.** `SOUL.md` is scored at init into Eva's trait profile, her baseline temperament. It weights which candidate within each cluster actually surfaces, so the same stimulus lands as *her* unique reaction.
 
 Finally, the Cortex renders the vector as a compact `<MOOD label=N%>` block in her mind.
 
