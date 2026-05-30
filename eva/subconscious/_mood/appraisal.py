@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import re
 
-from eva.subconscious._mood.labels import GO_EMOTIONS_LABELS, LABEL_INDEX
+from .labels import GO_EMOTIONS_LABELS, LABEL_INDEX
 
 
 # Lightweight text heuristic. Speech acts and second-person pronouns mean
@@ -52,14 +52,24 @@ _SECOND_PERSON_DISCOURSE_RE = re.compile(
     re.I,
 )
 
+# The senses layer frames every audio event with a source prefix —
+# "Adam said: ...", "I heard: ..." (eva/senses/audio/audio_sense.py).
+# Strip it so both the emotion model and this heuristic read the
+# utterance, not the framing tag. Anchored to the start so a colon
+# elsewhere in the sentence is left untouched.
+_SENSE_TAG_RE = re.compile(r"^(?:I heard|[\w\s]+ said):\s*", re.I)
+
+
+def strip_sense_tag(text: str) -> str:
+    """Drop the senses-layer source prefix ('Adam said:', 'I heard:')."""
+    return _SENSE_TAG_RE.sub("", text)
+
 
 def detect_direction(text: str) -> str:
-    """Return 'directed', 'empathic', or 'contagion' from text cues."""
-    
-    _, separator, utterance = text.partition(":")
-    if separator:
-        # strip "Adam said:" 
-        text = utterance.strip()
+    """Classify 'directed', 'empathic', or 'contagion' from text cues.
+
+    Expects the sense tag already stripped (see :func:`strip_sense_tag`).
+    """
     text = _SECOND_PERSON_DISCOURSE_RE.sub("", text)
     if (
         _YOU_RE.search(text)

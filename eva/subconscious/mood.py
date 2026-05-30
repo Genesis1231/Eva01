@@ -19,6 +19,7 @@ from eva.subconscious._mood.appraisal import (
     EMPATHIC_REACTIONS,
     _appraise,
     detect_direction,
+    strip_sense_tag,
 )
 from eva.subconscious._mood.labels import GO_EMOTIONS_LABELS  # re-exported
 from eva.utils.prompt import load_prompt
@@ -99,15 +100,16 @@ class MoodScorer:
 
     def score(self, text: str, source: str | None = None) -> list[float]:
         """Score ``text`` with optional speaker→listener appraisal. """
-        
+
+        text = strip_sense_tag(text)
         raw = self._raw(text)
         if source != "audio":
             return raw
         direction = detect_direction(text)
         if direction == "contagion":
             return raw
-        table = DIRECTED_REACTIONS if direction == "directed" else EMPATHIC_REACTIONS
-        return _appraise(raw, table, self.soul_profile)
+        direction_table = DIRECTED_REACTIONS if direction == "directed" else EMPATHIC_REACTIONS
+        return _appraise(raw, direction_table, self.soul_profile)
 
     
     @staticmethod
