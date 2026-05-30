@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Eva's Room — warm, literary look (see docs/journal). Palette, fonts, and
+   animations live in tailwind.config.js; components use utilities. Only the
+   things Tailwind can't express cleanly live here. Fonts: <link> in index.html. */
+
+@layer base {
+  html { font-size: 18px; }
+  #root { height: 100vh; }
+  body { @apply relative h-screen overflow-hidden bg-ink font-serif text-parchment antialiased; }
+
+  /* reading-lamp glow */
+  body::before {
+    content: "";
+    position: fixed;
+    top: -260px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1000px;
+    height: 680px;
+    background: radial-gradient(ellipse, rgba(200, 170, 120, 0.05), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  /* film grain */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    opacity: 0.035;
+    pointer-events: none;
+    z-index: 100;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 200px 200px;
+  }
+}
+
+@layer utilities {
+  /* stream edge dissolve — Tailwind has no mask-image utility */
+  .stream-mask {
+    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 88%, transparent);
+            mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 88%, transparent);
+  }
+}
+
+/* react-player: show the WHOLE clip (no crop). Override the light preview's
+   inline background-size:cover too, so the poster frame stays fully visible. */
+#canvas video { position: absolute; inset: 0; height: 100%; width: 100%; object-fit: contain; }
+#canvas [style*="background-image"] {
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+}
+
+/* @cyntler/react-doc-viewer: fill the canvas frame, strip the viewer chrome
+   (toolbar + page labels) so only the document shows — clean & deterministic. */
+.doc-viewer #react-doc-viewer,
+.doc-viewer #proxy-renderer,
+.doc-viewer #pdf-renderer { height: 100%; width: 100%; }
+.doc-viewer #pdf-controls,
+.doc-viewer #pdf-page-info { display: none !important; }
+
+
+/* Capture mode (/canvas): deterministic, artifact-only — freeze motion + strip
+   every decorative/non-deterministic layer so an unchanged artifact embeds identically. */
+body.capture-mode::before,
+body.capture-mode::after { display: none !important; }
+body.capture-mode,
+body.capture-mode * {
+  animation: none !important;
+  transition: none !important;
+  cursor: none !important;
+}

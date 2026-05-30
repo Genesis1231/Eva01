@@ -11,7 +11,6 @@ __pycache__/
 **/*(legacy)/
 
 # Frontend
-frontend/
 **/node_modules/
 **/dist/
 frontend/.env.local
@@ -20,7 +19,10 @@ frontend/.env.local
 CLAUDE.md
 AGENTS.md
 .claude/
+.codex/
 .vscode/
+.playwright-mcp/
+
 
 # Project Specific
 tests/
@@ -29,7 +31,7 @@ test/
 
 # Data and Media
 data/
-planning/
+
 
 *.wav
 *.mp3
