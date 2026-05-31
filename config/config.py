@@ -20,7 +20,11 @@ class Config(BaseModel):
         default=300,
         validation_alias=AliasPath("system", "heartbeat")
     )
-    
+    FEED_URL: str = Field(
+        default="",
+        validation_alias=AliasPath("system", "feed_url"),
+    )
+
     # Model settings
     MAIN_MODEL: str = Field(validation_alias=AliasPath("models", "main"))
     VISION_MODEL: str = Field(validation_alias=AliasPath("models", "vision"))

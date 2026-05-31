@@ -17,6 +17,7 @@ from config import logger, eva_configuration as config
 from eva.tools import ToolError
 from eva.utils.prompt import load_prompt
 from eva.tools._shared.video_analyzer import VideoAnalyzer
+from eva.utils.feed import feed_post
 
 _MAX_VIDEO_DURATION = 900  # 15 minutes — beyond this, use transcript
 _analyzer: VideoAnalyzer | None = None
@@ -96,6 +97,8 @@ async def watch_video(url: str) -> str:
     """Watch a video by URL. I use this when I want to know what's in a video."""
     if not url:
         return "I need a URL to watch."
+
+    feed_post("video", url)  # the clip on her desk → the Room canvas, while she watches
 
     is_youtube = "youtube.com" in url or "youtu.be" in url
 

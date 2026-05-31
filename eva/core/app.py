@@ -35,7 +35,6 @@ from eva.actions.machine.browser import Browser
 from eva.actions.system import MotorSystem
 from eva.actions.voice.speaker import Speaker
 
-
 @dataclass(frozen=True, slots=True)
 class Assembly:
     """Every component wake() needs to run and tear down. Returned by assemble()."""
@@ -46,7 +45,6 @@ class Assembly:
     motor_system: MotorSystem
     audio_sense: AudioSense
     camera_sense: CameraSense | None = None
-
 
 async def assemble(
     config: Config,
@@ -119,7 +117,6 @@ async def assemble(
     )
  
     # initialize transcriber and audio sense
-
     audio_sense = AudioSense(
         transcriber,
         speaker_identifier=speaker_identifier,
@@ -142,7 +139,8 @@ async def assemble(
 
     # Heartbeat
     heart = Heart(sense_buffer, task_db, config.HEARTBEAT_INTERVAL, is_busy=brain.is_busy)
-
+    
+    
     return Assembly(
         sense_buffer=sense_buffer,
         action_buffer=action_buffer,

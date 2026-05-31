@@ -59,7 +59,7 @@ Eva01 runs as a **concurrent pipeline**. Senses pour into a shared buffer, the m
                          
 ```
 
-### 🧠 The Three-Layer Mind (In Development) 
+### 🧠 The Three-Layer Mind  
 
 Eva01's brain operates as a ReAct loop persisted in a SQLite database. All experiences and people are recorded. Her memory distills noise into resonant impressions, preserving the moments that mattered.
 
@@ -105,7 +105,7 @@ Eva first scores what the *speaker* expressed, then translates that into her own
 Finally, the Cortex renders the vector as a compact `<MOOD label=N%>` block in her mind.
 
 
-### 🧩 The Intrinsic Drives 
+### 🧩 The Intrinsic Drives (In Development)
 
 Human behavior is often driven by impulses we can’t fully explain. Eva01 won’t merely execute user commands; she’ll be animated by intrinsic motivation through five core drives that spark goals of her own.
 
@@ -212,7 +212,7 @@ models:
 🆓 Setup for *completely free* if you have a decent GPU:
 ```yaml
 models:
-  main: "ollama:qwen3.5-27b"
+  main: "ollama:qwen3.5-35b"
   vision: "ollama:gemma4"
   stt: "faster-whisper"
   tts: "kokoro"

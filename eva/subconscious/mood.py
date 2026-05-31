@@ -118,6 +118,23 @@ class MoodScorer:
         return np.where(x >= 0, 1.0 / (1.0 + np.exp(-x)),
                         np.exp(x) / (1.0 + np.exp(x)))
     
+def surfaced_emotions(
+    mood: list[float] | None,
+    top_k: int = RENDER_TOP_K,
+) -> list[tuple[str, float]]:
+    """The mood's top-k non-neutral emotions that clear :data:`RENDER_THRESHOLD`,
+    strongest first. Shared by :func:`render_mood` (the brain's prompt block) and
+    the Room feed's ``mood_labels`` — one place for the filter/sort/threshold."""
+    if not mood:
+        return []
+    pairs = sorted(
+        ((label, p) for label, p in zip(GO_EMOTIONS_LABELS, mood)
+         if label != "neutral"),
+        key=lambda kv: -kv[1],
+    )
+    return [(label, p) for label, p in pairs[:top_k] if p >= RENDER_THRESHOLD]
+
+
 def render_mood(mood: list[float] | None) -> str:
     """Render mood as a compact ``<MOOD>label=N% ...</MOOD>`` block.
 
@@ -125,17 +142,7 @@ def render_mood(mood: list[float] | None) -> str:
     :data:`RENDER_THRESHOLD`) — no block, no noise. EVA sees the raw
     probabilities and articulates them in her own voice (or doesn't).
     """
-    if not mood:
-        return ""
-    pairs = sorted(
-        ((label, p) for label, p in zip(GO_EMOTIONS_LABELS, mood)
-         if label != "neutral"),
-        key=lambda kv: -kv[1],
-    )
-    surfaced = [
-        (label, p) for label, p in pairs[:RENDER_TOP_K]
-        if p >= RENDER_THRESHOLD
-    ]
+    surfaced = surfaced_emotions(mood)
     if not surfaced:
         return ""
     body = " ".join(f"{label}={round(p * 100)}%" for label, p in surfaced)

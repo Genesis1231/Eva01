@@ -28,7 +28,8 @@ from eva.core.memory import MemoryDB
 from eva.senses.sense_buffer import SenseEntry
 from eva.subconscious.mood import MoodScorer, _update_mood
 from eva.tools import load_tools, handle_tool_error
-
+from eva.subconscious.mood import render_mood
+from eva.utils.feed import feed_post
 
 class EvaState(TypedDict):
     messages: Annotated[List[BaseMessage], add_messages]
@@ -45,7 +46,7 @@ class Brain:
         model_name: str,
         action_buffer: ActionBuffer,
         memory: MemoryDB,
-        people: Dict,        
+        people: Dict,  
         checkpointer=None,
     ):
         self.tools = load_tools(action_buffer)
@@ -75,13 +76,15 @@ class Brain:
         """ The "think" node — EVA processes messages and decides on tool calls."""
 
         distilled, memory = await self.memory.prepare_context(state["messages"])
+        raw_mood = state.get("mood")
+        feed_post("mood", raw_mood)  # fire-and-forget; the feed renders the Room labels
 
         response = await self.cortex.respond(
             constructor=self.constructor,
             messages=distilled,
             present_people=state.get("present_people", set()),
             memory=memory,
-            mood=state.get("mood"),
+            mood=render_mood(raw_mood),
         )
 
         return {"messages": [response]}
@@ -153,6 +156,7 @@ class Brain:
                 "present_people": people_ids,
             }
             if entry.type != "thought":
+                feed_post("sense", entry.content)  # what the brain receives → the Room
                 state_update["mood"] = await asyncio.to_thread(
                     self.mood_scorer.score, entry.content, entry.type
                 )

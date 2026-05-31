@@ -7,10 +7,6 @@ For each source emotion the speaker expressed, the tables list the
 candidate emotions the listener might feel; :func:`_appraise` then
 redistributes the source mass across those candidates weighted by the
 listener's SOUL profile.
-
-Two tables because the candidate set depends on whether the listener
-is the *target* of the emotion (DIRECTED, "you screwed up") or a
-*bystander* to it (EMPATHIC, "I hate Mondays").
 """
 
 from __future__ import annotations

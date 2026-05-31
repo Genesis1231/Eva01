@@ -17,7 +17,6 @@ from langchain_core.messages import (
 
 from config import logger
 from eva.agent.constructor import PromptConstructor
-from eva.subconscious.mood import render_mood
 
 
 class Cortex:
@@ -46,18 +45,18 @@ class Cortex:
         messages: list[BaseMessage],
         present_people: set[str],
         memory: str = "",
-        mood: list[float] | None = None,
+        mood: str = "",
     ) -> AIMessage:
         """Construct prompt, trim messages, invoke LLM, return response."""
 
         # if sense is audio text, add to messages as HumanMessage;
         # if it's text, add to system prompt as OBSERVATION
-        timestamp = datetime.now().strftime("%A, %B %d, %Y at %I%p")
+        timestamp = datetime.now().strftime("%A, %B %d, %Y at %-I%p")
         system = constructor.build_system(
             timestamp=timestamp,
             memory=memory,
             present_people=present_people,
-            mood_block=render_mood(mood),
+            mood_block=mood,
         )
 
         # trim to fit context window, keeping recent messages

@@ -36,6 +36,10 @@ system:
   # Heartbeat interval in seconds. off/0 = disabled.
   heartbeat: 180
 
+  # Room feed endpoint — Eva POSTs her mood/senses/speech/artifacts here for the
+  # frontend Room to display. Empty = disabled (headless, no Room).
+  feed_url: "http://localhost:3000/api/post"
+
 models:
   # The core reasoning engine orchestrating EVA's personality and logic.
   # Common providers: "claude", "groq", "chatgpt", "mistral", "gemini", "llama"
