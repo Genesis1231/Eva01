@@ -120,6 +120,17 @@ Human behavior is often driven by impulses we can’t fully explain. Eva01 won�
 These aren't scripted behaviors. They're scoring functions that compete for her attention, and whichever drive is most unsatisfied generates the next self-directed action. Eva01 decides what to do with her time. Not you.
 
 
+## 🪟 Eva's Room
+
+You can **peek into Eva's mind** through Eva's Room, literary window — open it in a browser and watch her inner life unfold as it happens:
+
+- **Inner state** — her mood as a living sentence, *"Eva is curious, tender"*, straight from the GoEmotions vector above.
+- **Stream** — what she senses and what she says, scrolling like a quiet diary: perception in plain text, her own words in italic.
+- **Canvas** — whatever's on her desk right now: a page she opened, a video she pressed play on, a sketch of morning light.
+
+Run it with `npm --prefix frontend run dev`, then open `localhost:3000` while Eva is awake.
+
+
 ## 🚀 Quick Start 
 
 ### Requirements
@@ -274,6 +285,7 @@ Eva01 is an evolving project. Here's where she's headed:
 - [ ] **Cognitive architecture:** three-layer mind (autonomic → subconscious → conscious)
 - [ ] **Drive system:** intrinsic motivation 
 - [x] **Mood layer** — Eva's emotional state driven by subconcious, not LLM generation
+- [x] **Monitoring** — a live window to peek into Eva's mind
 - [ ] **Semantic memory:** knowledge consolidation and retrieval
 - [ ] **Self-modification:** eva adjusts her own config based on self-reflection
 

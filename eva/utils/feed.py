@@ -1,12 +1,6 @@
 """
 eva/utils/feed.py — Eva's outward feed: she posts text to the Room.
 
-Eva is a pure producer. Each post is a (kind, text) pair — kind says which part of
-the Room it belongs to (mood, a sense/speech line, an artifact on her desk). The
-Room (a Vite relay → SSE) fans it out to the browser, which routes by kind. The
-Room is an observer, never a dependency: with no url, or no one listening, a post
-is a silent no-op — Eva never stalls or fails for it.
-
 `feed_post` is fire-and-forget: it schedules the POST and returns immediately, so
 a slow or absent Room can't block Eva's reasoning. For kind="mood", pass the raw
 mood vector — the display labels are rendered here, and an unchanged mood is
@@ -14,7 +8,6 @@ skipped (so re-posting the same mood every reasoning step doesn't spam the Room)
 """
 
 import asyncio
-
 import httpx
 
 from config import logger, eva_configuration
@@ -25,9 +18,8 @@ _tasks: set[asyncio.Task] = set()
 _last_mood: str | None = None
 
 
-def mood_labels(mood: list[float] | None, top_k: int = 2) -> str:
-    """The Room's view of the mood vector: the top-k labels, strongest first —
-    e.g. "curious, tender" (no neutral, no percentages)."""
+def mood_labels(mood: list[float] | None, top_k: int = 3) -> str:
+    """The Room's view of the mood vector"""
     return ", ".join(label for label, _ in surfaced_emotions(mood, top_k))
 
 
@@ -39,7 +31,7 @@ async def _post(kind: str, text: str) -> None:
     try:
         await _feed_client.post(eva_configuration.FEED_URL, json={"kind": kind, "text": text})
     except Exception as e:
-        logger.debug(f"feed_post: dropped {kind} — {e}")
+        logger.warning(f"Feed_post: dropped {kind} — {e}")
 
 
 def feed_post(kind: str, text) -> None:
