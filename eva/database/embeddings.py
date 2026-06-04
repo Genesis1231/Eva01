@@ -1,55 +1,50 @@
 """Eva's embedding engine — one async facade over her multimodal embedding model(s).
 
 Two swappable providers, selected by a `provider:model` spec:
-    "qwenvl:Qwen3-VL-Embedding-8B"   — local MLX server: text + image embeddings AND the raw
+    "qwenvl:Qwen3-VL-Embedding-8B"   — local server: text + image embeddings AND the raw
                                        patch-token grid (the vision L1 signal). Default.
     "gemini:gemini-embedding-2"      — cloud Gemini Embedding 2: text + image embeddings (no patch).
 
-The engine is Eva's single Qwen-VL client: `embed_one`/`embed_many` (text), `embed_image`, and
-`patch` (raw token grid) all hit the same model. Patch features are Qwen-only — Gemini has no patch
-endpoint, so `patch()` returns None there (guarded by `supports_patches`). All calls safe-degrade to
-None when the provider is unavailable, so a dead server never raises into the caller.
 """
-
-from __future__ import annotations
 
 import asyncio
 import base64
 from typing import Any
 
 import numpy as np
-
+from utils.format import image_uri
 from config import logger
 
 
-def _data_uri(image: bytes, mime: str) -> str:
-    """Encoded image bytes -> a base64 data-URI the embedding servers accept."""
-    return f"data:{mime};base64," + base64.b64encode(image).decode("ascii")
-
-
 class QwenVLEmbedding:
-    """Local Qwen3-VL-Embedding MLX server: text + image embeddings and the raw patch-token grid.
-    """
+    """Local Qwen3-VL-Embedding server: text + image embeddings and the raw patch-token grid."""
 
     supports_patches = True
 
     def __init__(self, model: str, base_url: str | None, dimensions: int = 1024) -> None:
         self.model = model
-        self.base_url = (base_url or "http://192.168.3.46:8000").rstrip("/")
+        self.base_url = base_url
         self.dimensions = dimensions
         self._client: Any = None
 
     def init(self) -> None:
-        import httpx  # transport dep (already present via eva/utils/feed.py)
-
+        import httpx 
         with httpx.Client(trust_env=False, timeout=5.0) as client:
             client.get(f"{self.base_url}/health").raise_for_status()
 
     def _aclient(self):
-        if self._client is None:
-            import httpx
-
-            self._client = httpx.AsyncClient(base_url=self.base_url, trust_env=False, timeout=30.0)
+        """Lazily create an async client"""
+        
+        if self.base_url is None:
+            raise ValueError("Base URL is not set for QwenVLEmbedding")
+        
+        import httpx
+        if self._client is None :
+            self._client = httpx.AsyncClient(
+                base_url=self.base_url, 
+                trust_env=False, 
+                timeout=30.0
+            )
         return self._client
 
     async def _post(self, path: str, payload: dict) -> dict:
@@ -71,13 +66,13 @@ class QwenVLEmbedding:
         return await self._embeddings([{"text": t} for t in texts])
 
     async def embed_image(self, image: bytes, mime: str) -> list[float]:
-        return (await self._embeddings([{"image": _data_uri(image, mime)}]))[0]
+        return (await self._embeddings([{"image": image_uri(image, mime)}]))[0]
 
-    async def patch(self, image: bytes, mime: str) -> Optional[np.ndarray]:
+    async def patch(self, image: bytes, mime: str) -> np.ndarray | None:
         """A frame -> its unit-norm patch tokens (PP, FD), full native dim. None if non-finite."""
         response = await self._post(
             "/v1/patch_features",
-            {"inputs": [{"image": _data_uri(image, mime)}], "patch_grid": 16, "normalize": True},
+            {"inputs": [{"image": image_uri(image, mime)}], "patch_grid": 16, "normalize": True},
         )
         grid = response["data"][0]["grid"]
         array = np.frombuffer(base64.b64decode(grid["data"]), np.float16).astype(np.float32)
@@ -88,10 +83,7 @@ class QwenVLEmbedding:
 
 
 class GeminiEmbedding:
-    """Cloud Gemini Embedding 2: text + image embeddings (Matryoshka, default 768-d). No patch grid.
-
-    The google-genai client is synchronous, so calls run in a worker thread. Auth via the
-    GOOGLE_API_KEY / GEMINI_API_KEY environment variable (picked up by genai.Client())."""
+    """Cloud Gemini Embedding 2: text + image embeddings (Matryoshka, default 768-d)."""
 
     supports_patches = False
 
@@ -104,7 +96,7 @@ class GeminiEmbedding:
         try:
             from google import genai  # type: ignore[import-not-found]
         except ImportError as e:
-            raise ImportError("Install optional dependency 'google-genai' for the gemini embedder") from e
+            raise ImportError("Install dependency 'google-genai'") from e
 
         self._client = genai.Client()
 
@@ -133,15 +125,15 @@ class GeminiEmbedding:
         part = types.Part.from_bytes(data=image, mime_type=mime)
         return (await self._embed_content(part))[0]
 
-    async def patch(self, image: bytes, mime: str) -> Optional[np.ndarray]:
+    async def patch(self, image: bytes, mime: str) -> np.ndarray | None:
         return None  # Gemini has no patch-feature endpoint
 
 
 class EmbeddingEngine:
     """Provider-agnostic multimodal embedding facade with safe degradation."""
 
-    def __init__(self, embedding_provider: str, base_url: Optional[str] = None) -> None:
-        self.embedding_provider = embedding_provider or "qwenvl:Qwen3-VL-Embedding-8B"
+    def __init__(self, embedding_provider: str, base_url: str | None = None) -> None:
+        self.embedding_provider = embedding_provider
         self.base_url = base_url
 
         provider, model = self._parse_provider_spec(self.embedding_provider)
@@ -149,8 +141,8 @@ class EmbeddingEngine:
         self.model = model
 
         self._enabled = False
-        self._dimension: Optional[int] = None
-        self._embedding: Optional[QwenVLEmbedding | GeminiEmbedding] = None
+        self._dimension: int | None = None
+        self._embedding: QwenVLEmbedding | GeminiEmbedding | None = None
         self._supports_patches = False
 
     @staticmethod
@@ -168,7 +160,7 @@ class EmbeddingEngine:
         return self._enabled
 
     @property
-    def dimension(self) -> Optional[int]:
+    def dimension(self) -> int | None:
         return self._dimension
 
     @property
@@ -204,8 +196,9 @@ class EmbeddingEngine:
             self._enabled = False
             logger.warning(f"EmbeddingEngine {self.provider} error - {e}")
 
-    async def embed_one(self, text: str) -> Optional[list[float]]:
+    async def embed_one(self, text: str) -> list[float] | None:
         """Return embedding vector for text, or None when disabled/failing."""
+        
         if not self._enabled or not self._embedding:
             return None
 
@@ -222,9 +215,11 @@ class EmbeddingEngine:
             logger.warning(f"EmbeddingEngine: {self.provider} embedding failed - {e}")
             return None
 
-    async def embed_many(self, texts: list[str]) -> list[Optional[list[float]]]:
+    async def embed_many(self, texts: list[str]) -> list[list[float] | None]:
         """Embed multiple texts. Returns list parallel to input; None for empty/failed."""
+        
         if not self._enabled or not self._embedding:
+            logger.warning("EmbeddingEngine: embed_many called but engine is disabled")
             return [None] * len(texts)
 
         valid_indices = [i for i, t in enumerate(texts) if t and t.strip()]
@@ -233,7 +228,7 @@ class EmbeddingEngine:
 
         try:
             vectors = await self._embedding.embed_many([texts[i] for i in valid_indices])
-            result: list[Optional[list[float]]] = [None] * len(texts)
+            result: list[list[float] | None]  = [None] * len(texts)
             for idx, vec in zip(valid_indices, vectors):
                 result[idx] = vec
                 if self._dimension is None and vec:
@@ -243,7 +238,7 @@ class EmbeddingEngine:
             logger.warning(f"EmbeddingEngine: batch embed failed — {e}")
             return [None] * len(texts)
 
-    async def embed_image(self, image: bytes, mime: str = "image/jpeg") -> Optional[list[float]]:
+    async def embed_image(self, image: bytes, mime: str = "image/jpeg") -> list[float] | None:
         """Return the pooled embedding for an encoded image (bytes), or None when disabled/failing."""
         if not self._enabled or not self._embedding or not image:
             return None
@@ -256,10 +251,17 @@ class EmbeddingEngine:
             logger.warning(f"EmbeddingEngine: {self.provider} image embedding failed - {e}")
             return None
 
-    async def patch(self, image: bytes, mime: str = "image/jpeg") -> Optional[np.ndarray]:
+    async def patch(self, image: bytes, mime: str = "image/jpeg") -> np.ndarray | list[float] | None:
         """Return the raw (PP, FD) patch-token grid for an encoded image, or None when unsupported/failing."""
-        if not self._enabled or not self._embedding or not self._supports_patches or not image:
+        
+        if not self._enabled or not self._embedding or not image:
+            logger.warning("EmbeddingEngine: patch called but engine is disabled or image is empty")
             return None
+        
+        if not self._supports_patches:
+            # returns embeddings if patches are not supported.
+            return await self._embedding.embed_image(image, mime)
+        
         try:
             return await self._embedding.patch(image, mime)
         except Exception as e:

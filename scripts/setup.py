@@ -11,15 +11,19 @@ from config import DATA_DIR, logger
 
 MODELS_DIR = DATA_DIR / "models"
 
+HF = "https://huggingface.co"
+
 
 @dataclass(frozen=True)
 class ModelSpec:
-    """A single ONNX model to provision: where it lives, where to fetch, expected SHA."""
+    """A single model file to provision: where it lives, where to fetch, expected SHA."""
     label: str
     path: Path
     url: str
     sha256: str
 
+
+# --- VAD ---
 
 SILERO_VAD = ModelSpec(
     label="Silero VAD",
@@ -30,6 +34,8 @@ SILERO_VAD = ModelSpec(
     ),
     sha256="1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
 )
+
+# --- Speaker identification ---
 
 # sherpa-onnx's tagged release — same WeSpeaker weights with `model_type`
 # metadata baked in, which sherpa_onnx.SpeakerEmbeddingExtractor requires.
@@ -43,7 +49,46 @@ WESPEAKER_RESNET34_LM = ModelSpec(
     sha256="e9848563da86f263117134dfd7ad63c92355b37de492b55e325400c9d9c39012",
 )
 
-MODELS = [SILERO_VAD, WESPEAKER_RESNET34_LM]
+# --- TTS (voice-local extra) ---
+
+KOKORO_ONNX = ModelSpec(
+    label="Kokoro TTS (ONNX)",
+    path=MODELS_DIR / "kokoro-v1.0.onnx",
+    url=f"{HF}/hexgrad/Kokoro-82M-ONNX/resolve/main/kokoro-v1.0.onnx",
+    sha256="7d5df8ecf7d4b1878015a32686053fd0eebe2bc377234608764cc0ef3636a6c5",
+)
+
+KOKORO_VOICES = ModelSpec(
+    label="Kokoro voices",
+    path=MODELS_DIR / "voices-v1.0.bin",
+    url=f"{HF}/hexgrad/Kokoro-82M-ONNX/resolve/main/voices-v1.0.bin",
+    sha256="bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d",
+)
+
+# --- Mood / go_emotions ---
+
+GO_EMOTIONS_ONNX = ModelSpec(
+    label="go_emotions ONNX",
+    path=MODELS_DIR / "onnx" / "model_quantized.onnx",
+    url=f"{HF}/SamLowe/roberta-base-go_emotions-onnx/resolve/main/onnx/model_quantized.onnx",
+    sha256="0c1981c5b479674747911c8e2228f0c4ec90bf47bf66e830f7d4fc62be082958",
+)
+
+GO_EMOTIONS_TOKENIZER = ModelSpec(
+    label="go_emotions tokenizer",
+    path=MODELS_DIR / "tokenizer.json",
+    url=f"{HF}/SamLowe/roberta-base-go_emotions-onnx/resolve/main/tokenizer.json",
+    sha256="90e2336a1cdacffe5d4328ab323aa9e5c33889026e4e4881323bebdeeb0e179d",
+)
+
+MODELS = [
+    SILERO_VAD,
+    WESPEAKER_RESNET34_LM,
+    KOKORO_ONNX,
+    KOKORO_VOICES,
+    GO_EMOTIONS_ONNX,
+    GO_EMOTIONS_TOKENIZER,
+]
 
 
 def _sha256(path: Path) -> str:

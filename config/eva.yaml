@@ -12,13 +12,6 @@ system:
   #   - server   : Headless server mode, awaiting connections from the frontend.
   device: "local"
 
-  # Cognitive mode for EVA.
-  # Options: "basic", "advanced"
-  #   - basic : Basic mode, use stt and vision model to generate text response first.
-  #   - advanced : Advanced mode, directly input image and audio to the chat model.
-  # It is much cheaper to use the basic mode.
-  mode: "basic"
-
   # EVA's primary language for reasoning and vocalization.
   # Options: "en", "zh", "fr", "de", "it", "ja", "ko", "ru", "es", "pt", "nl", "multilingual"
   language: "en"
@@ -65,8 +58,9 @@ models:
   utility: "deepseek:deepseek-chat"
 
   # The multimodal embedding model for EVA's semantic memory + vision (text + image + patch).
-  # "qwenvl:<model>" — local MLX server (free, multimodal, default); "gemini:<model>" — cloud.
+  # "qwenvl:<model>" — local server (free, multimodal, default); "gemini:<model>" — cloud.
   embedding: "qwenvl:Qwen3-VL-Embedding-8B"
+
   # The embedding server URL (used by the qwenvl provider; gemini ignores it).
   embedding_url: "http://192.168.3.46:8000"
 

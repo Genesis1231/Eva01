@@ -1,7 +1,6 @@
 """EVA's look_at tool — visual perception of webpages and images."""
 
 import asyncio
-import base64
 import io
 import shutil
 import tempfile
@@ -15,6 +14,7 @@ from PIL import Image
 
 from config import logger, eva_configuration as config
 from eva.tools import ToolError
+from eva.utils.format import image_uri
 from eva.utils.prompt import load_prompt
 
 _vision = None
@@ -30,8 +30,8 @@ def _pick_browser() -> str:
             return path
     raise RuntimeError("No Chrome/Chromium binary found in PATH.")
 
-def _screenshot(url: str) -> str:
-    """Take a viewport screenshot, resize, return base64-encoded JPEG."""
+def _screenshot(url: str) -> bytes:
+    """Take a viewport screenshot, resize, return JPEG bytes."""
 
     logger.debug(f"Taking screenshot of {url}...")
     with tempfile.TemporaryDirectory() as tmp:
@@ -62,7 +62,7 @@ def _screenshot(url: str) -> str:
         img = img.resize(_VISION_SIZE, Image.Resampling.LANCZOS)
         buf = io.BytesIO()
         img.save(buf, format="JPEG", quality=85)
-        return base64.b64encode(buf.getvalue()).decode()
+        return buf.getvalue()
 
 
 def _get_vision():
@@ -76,13 +76,13 @@ def _get_vision():
 async def look_at(url: str) -> str:
     """I look at a webpage or image to see what's there before I decide to read or act on it."""
     try:
-        b64 = await asyncio.to_thread(_screenshot, url)
+        jpeg = await asyncio.to_thread(_screenshot, url)
 
         logger.debug(f"Analyzing screenshot...")
         prompt = load_prompt("look_at").format(title="", url=url)
         message = HumanMessage(content=[
             {"type": "text", "text": prompt},
-            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
+            {"type": "image_url", "image_url": {"url": image_uri(jpeg, "image/jpeg")}},
         ])
         response = await _get_vision().ainvoke([message])
         description = str(response.content)

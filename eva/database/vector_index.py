@@ -1,15 +1,8 @@
 """Reusable semantic vector store backed by SQLite + sqlite-vec (vec0).
 
 A *pure* vector store: callers hand in precomputed vectors and it does exact KNN
-over the whole store via sqlite-vec's `vec0` virtual table (cosine). It does NOT
-embed — callers turn their own content into vectors (via EmbeddingEngine) and hand
-them in — and it applies NO ranking policy — callers rank the cosine hits however
-they like (recency, activation, ...). One vec0 table per `prefix` (`{prefix}_vec`),
-created lazily at the dimension of the first vector stored. Reusable by any domain
-store (journal, moments, ...).
+over the whole store via sqlite-vec's `vec0` virtual table (cosine). 
 """
-
-from __future__ import annotations
 
 import numpy as np
 import sqlite_vec
@@ -30,15 +23,19 @@ class VectorIndex:
         self._db = db
         self._table = f"{prefix}_vec"
         self._ready = False
+        self._dim: int | None = None
 
     async def _ensure(self, dim: int) -> None:
         """Create the vec0 table once, at the dimension of the first vector seen."""
         if self._ready:
+            if dim != self._dim:
+                raise ValueError(f"dimension mismatch: table has {self._dim}d, got {dim}d")
             return
         await self._db.execute(
             f"CREATE VIRTUAL TABLE IF NOT EXISTS {self._table} "
             f"USING vec0(entry_id TEXT PRIMARY KEY, embedding float[{dim}] distance_metric=cosine)"
         )
+        self._dim = dim
         self._ready = True
 
     async def _exists(self) -> bool:

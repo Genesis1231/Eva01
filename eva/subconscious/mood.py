@@ -64,9 +64,8 @@ class MoodScorer:
 
         if not (_ONNX_PATH.exists() and _TOKENIZER_PATH.exists()):
             raise FileNotFoundError(
-                f"go_emotions model files not in {_MODEL_DIR}. "
-                "Run snapshot_download for "
-                "SamLowe/roberta-base-go_emotions-onnx into data/models/."
+                f"go_emotions model files not found in {_MODEL_DIR}. "
+                "Run `eva-setup` to download them."
             )
 
         try:
