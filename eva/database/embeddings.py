@@ -12,7 +12,7 @@ import base64
 from typing import Any
 
 import numpy as np
-from utils.format import image_uri
+from eva.utils.format import image_uri
 from config import logger
 
 

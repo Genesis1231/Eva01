@@ -75,7 +75,7 @@ class VectorIndex:
         try:
             rows = list(await self._db.fetchall(
                 f"""SELECT entry_id, distance FROM {self._table}
-                WHERE embedding MATCH ? AND k = ? ORDER BY distance""",
+                WHERE embedding MATCH ? AND k = ?""",
                 (_blob(query_vector), limit),
             ))
         except Exception as e:
