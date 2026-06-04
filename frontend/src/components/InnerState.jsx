@@ -13,7 +13,7 @@ function MoodSentence({ mood }) {
   if (parts.length === 0) return <span className="text-meta">Eva is asleep. zzZ</span>;
   return (
     <>
-      <span className="text-meta">Eva is</span>{" "}
+      <span className="text-meta">Eva is feeling: </span>{" "}
       {parts.map((word, i) => (
         <span key={i}>
           {i > 0 && ", "}
