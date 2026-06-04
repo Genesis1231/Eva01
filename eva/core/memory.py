@@ -8,13 +8,9 @@ Context assembly:
     journal (recent entries) + distilled current session → system prompt
 """
 import asyncio
-import re
 from typing import Iterable, cast
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
-
-# Sensory prefixes that add noise to semantic queries
-_SENSE_PREFIX = re.compile(r"^(?:I (?:heard|see|observe|noticed)|[\w\s]+ said):\s*", re.IGNORECASE)
 
 from config import logger
 from eva.agent.schema import PeopleReflection
@@ -153,30 +149,7 @@ class MemoryDB:
         entries = await self._journal.get_recent(limit)
         journal_summary = "\n\n".join(entries) if entries else ""
 
-        # Testing path: if no recent summary exists, try semantic recall from current context.
-        if not journal_summary:
-            query = self._build_recall_query(distilled)
-            if query:
-                journal_summary = await self._journal.get_semantic_context(query=query, limit=limit)
-
         return distilled, journal_summary
-
-    @staticmethod
-    def _build_recall_query(distilled: list, max_messages: int = 3) -> str:
-        """Build a clean semantic query from recent conversation context."""
-        parts: list[str] = []
-        for msg in reversed(distilled):
-            if isinstance(msg, HumanMessage):
-                text = MemoryDB._text_content(msg.content)
-                text = _SENSE_PREFIX.sub("", text).strip()
-                if text:
-                    parts.append(text)
-                if len(parts) >= max_messages:
-                    break
-
-        # Chronological order, joined
-        parts.reverse()
-        return " ".join(parts)
 
     @staticmethod
     def _text_content(content) -> str:
@@ -229,8 +202,7 @@ class MemoryDB:
                 self._reflect_people(conversation)
             )
 
-            # Store summary as content, raw conversation as source for richer embedding
-            await self._journal.add(journal, session_id, source=conversation)
+            await self._journal.add(journal, session_id)
             logger.debug(f"MemoryDB: journaled session: {journal}.")
             return
         except Exception as e:

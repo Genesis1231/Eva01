@@ -28,7 +28,6 @@ from eva.senses.vision.face_identifier import FaceIdentifier
 
 from eva.database.db import SQLiteHandler
 from eva.database.embeddings import EmbeddingEngine
-from eva.database.vector_index import VectorIndex
 from eva.actions.action_buffer import ActionBuffer
 from eva.actions.voice.voice_actor import VoiceActor
 from eva.actions.machine.browser import Browser
@@ -66,8 +65,7 @@ async def assemble(
 
     # People, Memory & Tasks
     people_db = PeopleDB(db)
-    journal_vectors = VectorIndex(db, prefix="journal")
-    journal_db = JournalDB(db, vectors=journal_vectors, embedder=embedder)
+    journal_db = JournalDB(db)
     task_db = TaskDB(db)
     await asyncio.gather(
         people_db.init_db(),
@@ -137,8 +135,8 @@ async def assemble(
         checkpointer=checkpointer,
     )
 
-    # Heartbeat
-    heart = Heart(sense_buffer, task_db, config.HEARTBEAT_INTERVAL, is_busy=brain.is_busy)
+    # Heartbeat — autonomic vitals (storage / connectivity / embedding server)
+    heart = Heart(db, config.HEARTBEAT_INTERVAL, embedding_url=config.EMBEDDING_URL)
     
     
     return Assembly(
