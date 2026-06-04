@@ -15,13 +15,12 @@ from tokenizers import Tokenizer
 
 from config import DATA_DIR, logger
 from eva.subconscious._mood.appraisal import (
-    DIRECTED_REACTIONS,
-    EMPATHIC_REACTIONS,
+    GO_EMOTIONS_LABELS, 
     _appraise,
     detect_direction,
     strip_sense_tag,
 )
-from eva.subconscious._mood.labels import GO_EMOTIONS_LABELS  # re-exported
+from eva.subconscious._mood.labels import EMPATHIC_REACTIONS, DIRECTED_REACTIONS
 from eva.utils.prompt import load_prompt
 
 
@@ -136,12 +135,8 @@ def surfaced_emotions(
 
 
 def render_mood(mood: list[float] | None) -> str:
-    """Render mood as a compact ``<MOOD>label=N% ...</MOOD>`` block.
-
-    Returns the empty string when mood is genuinely flat (no label clears
-    :data:`RENDER_THRESHOLD`) — no block, no noise. EVA sees the raw
-    probabilities and articulates them in her own voice (or doesn't).
-    """
+    """Render mood as a compact ``<MOOD>label=N% ...</MOOD>`` block. """
+    
     surfaced = surfaced_emotions(mood)
     if not surfaced:
         return ""
