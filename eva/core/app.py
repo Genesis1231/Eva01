@@ -62,12 +62,12 @@ async def assemble(
     sense_buffer.attach_loop(loop)
 
     # Semantic embedding engine (safe-degrading if provider/deps are unavailable)
-    embedder = EmbeddingEngine(config.EMBEDDING_MODEL, base_url=config.BASE_URL)
+    embedder = EmbeddingEngine(config.EMBEDDING_MODEL, base_url=config.EMBEDDING_URL)
 
     # People, Memory & Tasks
     people_db = PeopleDB(db)
-    journal_vectors = VectorIndex(db, embedder, prefix="journal")
-    journal_db = JournalDB(db, vectors=journal_vectors)
+    journal_vectors = VectorIndex(db, prefix="journal")
+    journal_db = JournalDB(db, vectors=journal_vectors, embedder=embedder)
     task_db = TaskDB(db)
     await asyncio.gather(
         people_db.init_db(),
@@ -85,7 +85,7 @@ async def assemble(
     face_identifier = None
     if config.CAMERA is not False:
         describer = Describer(config.VISION_MODEL)
-        face_identifier = FaceIdentifier(people_db)
+        # face_identifier = FaceIdentifier(people_db) temply disable face ID.
         camera_sense = CameraSense(
             describer=describer, 
             identifier=face_identifier, 

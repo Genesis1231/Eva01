@@ -32,8 +32,12 @@ class Config(BaseModel):
     TTS_MODEL: str = Field(validation_alias=AliasPath("models", "tts"))
     UTILITY_MODEL: str = Field(validation_alias=AliasPath("models", "utility"))
     EMBEDDING_MODEL: str = Field(
-        default="fastembed:bge-small-en-v1.5",
+        default="qwenvl:Qwen3-VL-Embedding-8B",
         validation_alias=AliasPath("models", "embedding"),
+    )
+    EMBEDDING_URL: str = Field(
+        default="http://192.168.3.46:8000",
+        validation_alias=AliasPath("models", "embedding_url"),
     )
 
     @classmethod

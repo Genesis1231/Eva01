@@ -64,9 +64,11 @@ models:
   # Common providers: "google", "llama", "chatgpt", "claude", "deepseek-chat"
   utility: "deepseek:deepseek-chat"
 
-  # The embedding model for EVA's semantic memory.
-  # Examples: "openai:text-embedding-3-small", "fastembed:bge-small-en-v1.5"
-  embedding: "openai:text-embedding-3-small"
+  # The multimodal embedding model for EVA's semantic memory + vision (text + image + patch).
+  # "qwenvl:<model>" — local MLX server (free, multimodal, default); "gemini:<model>" — cloud.
+  embedding: "qwenvl:Qwen3-VL-Embedding-8B"
+  # The embedding server URL (used by the qwenvl provider; gemini ignores it).
+  embedding_url: "http://192.168.3.46:8000"
 
 
 
