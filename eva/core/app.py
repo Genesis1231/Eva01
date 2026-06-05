@@ -141,6 +141,8 @@ async def assemble(
     subconscious = None
     if camera_sense and camera_sense.is_available and embedder.enabled:
         session_dir = DATA_DIR / "session"
+        session_dir.mkdir(parents=True, exist_ok=True)
+        
         recognition_memory = await RecognitionMemory.seed(
             prior_stream = session_dir / "stream",
             cache_path = session_dir / "seed_embed.npy",
@@ -156,7 +158,7 @@ async def assemble(
             sense_buffer,
             camera_sense,
             vision_detector,
-            inspect_dir=session_dir / "inspects",
+            inspect_dir = session_dir / "inspects",
         )
 
     return Assembly(
@@ -207,8 +209,10 @@ async def wake() -> None:
                 breathe(eva.sense_buffer, eva.brain),
                 eva.action_buffer.start_loop(),
             ]
+            print("subconcious mind:", eva.subconscious)
             if eva.subconscious is not None:
                 loops.append(eva.subconscious.start())
+                
             await asyncio.gather(*loops)
         except (KeyboardInterrupt, asyncio.CancelledError):
             pass

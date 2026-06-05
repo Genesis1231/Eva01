@@ -191,7 +191,7 @@ class MemoryDB:
         logger.debug(f"MemoryDB: writing journal entry:\n{conversation}")
         
         # Skip journaling for trivially short sessions (e.g. a single observation)
-        if len(conversation.split()) < 30:
+        if len(conversation.split()) < 200:
             logger.debug("MemoryDB: session too short to journal, skipping.")
             return
         

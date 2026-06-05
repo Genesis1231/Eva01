@@ -12,11 +12,7 @@ from eva.utils.prompt import load_prompt
 
 class PromptConstructor:
     """
-    PromptConstructor class:
-
-    Attributes:
-        persona_prompt (str): The persona prompt loaded from the persona.md file.
-        instruction_prompt (str): The instruction prompt loaded from the instructions.md file.
+    PromptConstructor class: Loads persona and instruction templates from files.
     """
 
     def __init__(self, people: dict[str, Any] | None = None):

@@ -28,6 +28,8 @@ AGENTS.md
 tests/
 planning/
 test/
+config/eva.yaml
+!config/eva.example.yaml
 
 # Data and Media
 data/

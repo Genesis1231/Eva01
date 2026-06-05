@@ -30,7 +30,7 @@ def _pick_browser() -> str:
             return path
     raise RuntimeError("No Chrome/Chromium binary found in PATH.")
 
-def _screenshot(url: str) -> bytes:
+def _screenshot(url: str) -> bytes | None:
     """Take a viewport screenshot, resize, return JPEG bytes."""
 
     logger.debug(f"Taking screenshot of {url}...")
@@ -51,7 +51,7 @@ def _screenshot(url: str) -> bytes:
             )
         except Exception as e:
             logger.error(f"Failed to initialize Html2Image: {e}")
-            return f"I can't look at the url: {e}"
+            return None
 
         hti.screenshot(url=url, save_as="shot.png")
         png_path = Path(tmp) / "shot.png"
@@ -77,6 +77,8 @@ async def look_at(url: str) -> str:
     """I look at a webpage or image to see what's there before I decide to read or act on it."""
     try:
         jpeg = await asyncio.to_thread(_screenshot, url)
+        if jpeg is None:
+            return f"I can't screenshot and look at the url."
 
         logger.debug(f"Analyzing screenshot...")
         prompt = load_prompt("look_at").format(title="", url=url)

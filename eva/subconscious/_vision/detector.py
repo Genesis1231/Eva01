@@ -157,7 +157,7 @@ class VisionDetector:
         """Value + Route a finished peak: embed it, score vs the bank, route, grow the bank if normal."""
 
         vector = as_vector(await self.engine.embed_image(to_jpeg(peak.frame)))
-        if vector is None:  # embed failed: can't value it -> acknowledge, no admit
+        if vector is None:
             logger.error("Failed to embed the peak frame.")
             return CamEvent(
                 peak.novelty,

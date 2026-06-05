@@ -8,7 +8,9 @@ license = { file = "LICENSE" }
 
 # Runtime dependencies are tracked in requirements.txt.
 # Install in dev mode with: uv pip install -e .
-dependencies = []
+dependencies = [
+    "html2image>=2.0.7",
+]
 
 [project.optional-dependencies]
 embed-openai = [

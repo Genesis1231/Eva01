@@ -1,8 +1,12 @@
 # =============================================================================
 # EVA01 CONFIGURATION
-# 
-# Shape the mind and senses of EVA. Adjust the settings below to switch 
+#
+# Shape the mind and senses of EVA. Adjust the settings below to switch
 # deployment modes, configure languages, and swap out her neural engines.
+#
+# This is the template. Copy it to `eva.yaml` and edit for your machine:
+#     cp config/eva.example.yaml config/eva.yaml
+# `eva.yaml` is gitignored — keep your local URLs and tweaks out of version control.
 # =============================================================================
 
 system:
@@ -24,10 +28,10 @@ system:
   #   off            : disable camera entirely
   #   0              : local webcam (device index)
   #   "http://..."   : network stream URL
-  camera: off #"http://127.0.0.1:5000/video"
+  camera: off
 
   # Heartbeat interval in seconds. off/0 = disabled.
-  heartbeat: 180
+  heartbeat: 60
 
   # Room feed endpoint — Eva POSTs her mood/senses/speech/artifacts here for the
   # frontend Room to display. Empty = disabled (headless, no Room).
@@ -38,7 +42,7 @@ models:
   # Common providers: "claude", "groq", "chatgpt", "mistral", "gemini", "llama"
   # AWS: bedrock_converse:us.anthropic.claude-opus-4-6-v1
   # Recommended: "claude-4.0-sonnet" (for highest emotional intelligence)
-  main: "bedrock_converse:us.anthropic.claude-opus-4-6-v1"
+  main: "anthropic:claude-opus-4-6"
 
   # The visual cortex: how EVA interprets images from her webcam or the user.
   # Uses LangChain format "provider:model" — e.g. "openai:gpt-4o-mini", "groq:llama-4-scout-17b-16e-instruct"
@@ -62,7 +66,4 @@ models:
   embedding: "qwenvl:Qwen3-VL-Embedding-8B"
 
   # The embedding server URL (used by the qwenvl provider; gemini ignores it).
-  embedding_url: "http://192.168.3.46:8000"
-
-
-
+  embedding_url: "http://localhost:8000"

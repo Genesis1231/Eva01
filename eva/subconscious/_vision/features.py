@@ -15,7 +15,7 @@ import cv2
 import numpy as np
 
 KNN, TOP_K = 8, 5    # per-patch k-NN; frame novelty = mean of the TOP_K most-novel patches
-CV_GRID_SIZE = (320, 240)     # width, height
+CV_GRID_SIZE = (320, 240)   # grid size
 CV_GRID_TILES = (8, 8)      # rows, columns
 
 
@@ -26,40 +26,49 @@ def to_jpeg(frame: np.ndarray, quality: int = 88) -> bytes:
 
 
 def as_vector(embedding: list[float] | None) -> np.ndarray | None:
-    """The engine's pooled embedding (a list) -> a unit-norm (1, D) row, or None."""
+    """The engine's pooled embedding (a list)."""
     if not embedding:
         return None
     vector = np.asarray(embedding, np.float32)
-    return (vector / (np.linalg.norm(vector) + 1e-9))[None, :]
+    vector /= (np.linalg.norm(vector) + 1e-9) 
+    return vector[None, :]
 
 
 def cv_patch_grid(frame: np.ndarray) -> np.ndarray:
-    """CV2 fallback patch grid for providers without learned patch tokens."""
-    
+    """CV2 fallback patch grid for providers without patch features."""
+
     small = cv2.resize(frame, CV_GRID_SIZE, interpolation=cv2.INTER_AREA)
     if small.ndim == 3:
         gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
     else:
         gray = small
-    gray = cv2.GaussianBlur(gray, (3, 3), 0).astype(np.float32) / 255.0
+    gray = cv2.GaussianBlur(gray, (3, 3), 0).astype(np.float32) 
+    gray /= 255.0
 
     rows, columns = CV_GRID_TILES
     tile_h = CV_GRID_SIZE[1] // rows
     tile_w = CV_GRID_SIZE[0] // columns
-    patches = []
-    for row in range(rows):
-        y0 = row * tile_h
-        for column in range(columns):
-            x0 = column * tile_w
-            tile = gray[y0:y0 + tile_h, x0:x0 + tile_w].reshape(-1) - 0.5
-            norm = float(np.linalg.norm(tile))
-            if norm < 1e-6:
-                tile = np.full(tile.shape, 1.0 / np.sqrt(tile.size), dtype=np.float32)
-            else:
-                tile = tile / norm
-            patches.append(tile.astype(np.float32, copy=False))
-    
-    return np.vstack(patches).astype(np.float32, copy=False)
+
+    # Vectorized tile extraction
+    patches = (gray
+               .reshape(rows, tile_h, columns, tile_w)
+               .transpose(0, 2, 1, 3)
+               .reshape(-1, tile_h * tile_w))
+
+    patches = np.ascontiguousarray(patches)
+    patches -= 0.5
+
+    # L2-normalize all patches at once (already in-place via patches /=)
+    norms = np.linalg.norm(patches, axis=1, keepdims=True)
+    zero_rows = (norms < 1e-6).ravel()
+    np.maximum(norms, 1e-6, out=norms)
+    patches /= norms
+
+    # Replace near-zero-norm rows with uniform unit vector
+    if zero_rows.any():
+        patches[zero_rows] = 1.0 / np.sqrt(tile_h * tile_w)
+
+    return patches
 
 
 # L1: per-patch novelty (recency-FIFO habituation)
@@ -75,9 +84,7 @@ def patch_novelty(query_patches: np.ndarray, reference_patches: np.ndarray) -> f
 
 # L2: recognition novelty (lifelong recognition)
 def embed_novelty(query: np.ndarray, reference: np.ndarray) -> float:
-    """Novelty of a frame's pooled embedding (1, D) vs a reference set of normal vectors:
-    1 - mean of the KNN nearest cosines. (1-NN over a small bank is spiky — one lucky match
-    zeroes the score — so k-NN is a steadier estimate and matches L1's smoothing.)"""
+    """Novelty of a frame's pooled embedding (1, D) vs a reference set of normal vectors"""
 
     similarities = reference @ query[0]
     k = min(KNN, similarities.shape[0])

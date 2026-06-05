@@ -149,19 +149,23 @@ class Brain:
 
             message = HumanMessage(content=entry.content)
 
-            # External senses drive mood; inner-voice "thought" events
-            # are excluded — outside factors change mood, not narration.
-            state_update: dict = {
+            mood = await asyncio.to_thread(
+                self.mood_scorer.score,
+                entry.content,
+                entry.type,
+            )
+            
+            state_update: EvaState = {
                 "messages": [message],
                 "present_people": people_ids,
+                "mood": mood,
             }
-            if entry.type != "thought":
-                feed_post("sense", entry.content)  # what the brain receives → the Room
-                state_update["mood"] = await asyncio.to_thread(
-                    self.mood_scorer.score, entry.content, entry.type
-                )
 
+            feed_post("sense", entry.content)  # send to the Room
             await self._graph.ainvoke(state_update, config=self._config)
+            
+        except Exception as e:
+            logger.warning(f"EVA: brain invocation error — {e}")
         finally:
             self._processing = False
 

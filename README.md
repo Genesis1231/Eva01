@@ -63,7 +63,7 @@ Eva01 runs as a **concurrent pipeline**. Senses pour into a shared buffer, the m
 
 Eva01's brain operates as a ReAct loop persisted in a SQLite database. All experiences and people are recorded. Her memory distills noise into resonant impressions, preserving the moments that mattered.
 
-What's coming is deeper: a **cognitive architecture** modeled after human consciousness, with three layers that think at different speeds, different depths, and different levels of awareness.
+This is growing into a **cognitive architecture** modeled after human consciousness: three layers that think at different speeds, depths, and levels of awareness. The scaffold is now live — an autonomic heart that takes her own pulse, a subconscious that gates perception, and the conscious graph above them.
 
 ```text
 ┌─────────────────────────────────────────────────────┐
@@ -159,7 +159,13 @@ cp .env.example .env
 # Add your API keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)
 ```
 
-Edit `config/eva.yaml` to configure EVA:
+Copy the config template and edit it for your machine (`config/eva.yaml` is gitignored, so your local URLs stay private):
+
+```bash
+cp config/eva.example.yaml config/eva.yaml
+```
+
+Key settings in `config/eva.yaml`:
 
 ```yaml
 system:
@@ -194,6 +200,11 @@ models:
 
   # Utility/sub-task model for lightweight background tasks.
   utility: "openai:gpt-4o-mini"
+
+  # Multimodal embedding model — powers semantic memory and the vision novelty gate.
+  # "qwenvl:<model>" runs on a local server (free); "gemini:<model>" is cloud.
+  embedding: "qwenvl:Qwen3-VL-Embedding-8B"
+  embedding_url: "http://localhost:8000"   # used by the qwenvl provider
 ```
 
 Notes:
@@ -280,7 +291,7 @@ Eva01 is an evolving project. Here's where she's headed:
 - [x] **People understanding:** Eva remembers who she's met and how she felt about them.
 - [x] **New tool system:** plug'n play tools, she can learn anything easily
 - [x] **Episodic memory:** short term memory consolidation and retrival
-- [ ] **Cognitive architecture:** three-layer mind (autonomic → subconscious → conscious)
+- [ ] **Cognitive architecture:** three-layer mind (autonomic → subconscious → conscious) — *in progress: autonomic heart + subconscious vision gate live*
 - [ ] **Drive system:** intrinsic motivation 
 - [x] **Mood layer** — Eva's emotional state driven by subconcious, not LLM generation
 - [x] **Monitoring** — a live window to peek into Eva's mind

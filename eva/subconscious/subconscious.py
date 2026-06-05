@@ -11,6 +11,7 @@ from pathlib import Path
 import cv2
 
 from config import logger
+from eva.utils.format import image_uri
 from eva.senses.sense_buffer import SenseBuffer
 from eva.senses.vision.vision_sense import CameraSense
 from eva.subconscious._vision.detector import CamEvent, VisionDetector
@@ -19,8 +20,7 @@ from eva.subconscious._vision.detector import CamEvent, VisionDetector
 class Subconscious:
     """The subconscious layer, surfacing novel moments up."""
 
-    GATE_INTERVAL = 1.0     # seconds per glance (~1 fps): L1's window + Z_TRIGGER were tuned here
-
+    GATE_INTERVAL = 1.0     # seconds per glance (~1 fps)
     def __init__(
         self,
         sense_buffer: SenseBuffer,
@@ -35,6 +35,8 @@ class Subconscious:
         self.inspect_dir = inspect_dir
         self.interval = interval
         self._stop = asyncio.Event()
+        
+        logger.debug("Subconscious: initialized.")
 
     async def start(self) -> None:
         """Beat forever — glance, gate, surface. A peer in wake()'s asyncio.gather."""
@@ -52,7 +54,15 @@ class Subconscious:
                 logger.error(f"Subconscious: gate error — {e}")
                 
             await self._pace(self.interval - (time.monotonic() - started))
+            print(".", end="")  # heartbeat for the gate loop
 
+    async def _pace(self, remaining: float) -> None:
+        """Sleep the rest of the interval, but wake immediately on stop — holds ~1 fps."""
+        try:
+            await asyncio.wait_for(self._stop.wait(), timeout=max(0.0, remaining))
+        except asyncio.TimeoutError:
+            pass
+        
     async def _glance(self) -> None:
         """Inspect wakes the brain; acknowledge habituates."""
         
@@ -69,26 +79,27 @@ class Subconscious:
             # acknowledge — familiar → habituate quietly
             logger.debug(f"Subconscious: familiar habituation — novelty_z={view.event.novelty_z:.2f}, long_nov={view.event.long_nov:.3f}")
 
-    async def _pace(self, remaining: float) -> None:
-        """Sleep the rest of the interval, but wake immediately on stop — holds ~1 fps."""
-        try:
-            await asyncio.wait_for(self._stop.wait(), timeout=max(0.0, remaining))
-        except asyncio.TimeoutError:
-            pass
+
 
     async def _surface(self, event: CamEvent) -> None:
-        """Describe the novel scene and wake the brain; always keep the frame + still wake if describe
-        fails (a genuine novelty must not vanish on a transient vision-model hiccup)."""
+        """Describe the novel scene and wake the brain."""
         
         self._save_inspect(event) # keep the novel frame
+        
         description = await self.vision.describe(event.frame)
+        if not description:
+            logger.warning("Describer: Failed to describe a novel scene.")
+            description = "I saw something new, but I couldn't describe it."
+        
+        _, buffer = cv2.imencode('.jpg', event.frame)
+        frame_uri = image_uri(buffer.tobytes(), "image/jpeg")
+        
         self.sense_buffer.push(
             "observation",
-            f"<OBSERVATION>{description or 'something new in view'}</OBSERVATION>",
+            f" I SAW SOMETHING NEW! <OBSERVATION>{description}</OBSERVATION> I WONDER WHAT THAT IS?",
             metadata={
-                "novelty_z": round(event.novelty_z, 2),
-                "long_nov": round(event.long_nov, 3),
                 "level": event.level,
+                "uri": frame_uri,
             },
         )
 
