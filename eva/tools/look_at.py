@@ -7,17 +7,13 @@ import tempfile
 from pathlib import Path
 
 from html2image import Html2Image
-from langchain.chat_models import init_chat_model
-from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
 from PIL import Image
 
-from config import logger, eva_configuration as config
+from config import logger
 from eva.tools import ToolError
 from eva.utils.format import image_uri
-from eva.utils.prompt import load_prompt
 
-_vision = None
 _VIEWPORT = (1280, 800)
 _VISION_SIZE = (800, 500)
 
@@ -61,35 +57,24 @@ def _screenshot(url: str) -> bytes | None:
         img = Image.open(png_path)
         img = img.resize(_VISION_SIZE, Image.Resampling.LANCZOS)
         buf = io.BytesIO()
-        img.save(buf, format="JPEG", quality=85)
+        img.save(buf, format="JPEG", quality=95)
         return buf.getvalue()
 
 
-def _get_vision():
-    global _vision
-    if _vision is None:
-        _vision = init_chat_model(config.VISION_MODEL, temperature=0.1)
-    return _vision
-
-
 @tool
-async def look_at(url: str) -> str:
+async def look_at(url: str) -> str | list:
     """I look at a webpage or image to see what's there before I decide to read or act on it."""
     try:
         jpeg = await asyncio.to_thread(_screenshot, url)
         if jpeg is None:
-            return f"I can't screenshot and look at the url."
+            return "Screenshot failed — I can't see."
 
-        logger.debug(f"Analyzing screenshot...")
-        prompt = load_prompt("look_at").format(title="", url=url)
-        message = HumanMessage(content=[
-            {"type": "text", "text": prompt},
+        # Hand the screenshot straight to my own eyes (the brain's vision) — no separate vision model.
+        # Returning content blocks: the tool layer wraps them into a ToolMessage and fills the tool_call_id.
+        return [
+            {"type": "text", "text": f"This is what I see at {url}:"},
             {"type": "image_url", "image_url": {"url": image_uri(jpeg, "image/jpeg")}},
-        ])
-        response = await _get_vision().ainvoke([message])
-        description = str(response.content)
-
-        return f"I looked at {url}:\n{description}\n"
+        ]
     except Exception as e:
-        logger.error(f"look_at error: {e}")
+        logger.error(f"Tools: look_at tool error: {e}")
         raise ToolError(str(e), tool_name="look_at") from e

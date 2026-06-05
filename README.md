@@ -236,6 +236,8 @@ models:
 ```bash
 python main.py
 ```
+Hold spacebar to talk. 
+Eva01 runs herself. 👋
 
 ### Personal Customization
 
@@ -250,9 +252,7 @@ python idconfig.py
 4. Done!
 ```
 
-### 🖥️ Interface 
-Hold spacebar to talk. 
-Eva01 runs herself. 👋
+
 
 ### 🪟 Eva's Room
 
@@ -291,7 +291,7 @@ Eva01 is an evolving project. Here's where she's headed:
 - [x] **People understanding:** Eva remembers who she's met and how she felt about them.
 - [x] **New tool system:** plug'n play tools, she can learn anything easily
 - [x] **Episodic memory:** short term memory consolidation and retrival
-- [ ] **Cognitive architecture:** three-layer mind (autonomic → subconscious → conscious) — *in progress: autonomic heart + subconscious vision gate live*
+- [o] **Cognitive architecture:** three-layer mind (autonomic → subconscious → conscious) — *in progress: autonomic heart + subconscious vision gate live*
 - [ ] **Drive system:** intrinsic motivation 
 - [x] **Mood layer** — Eva's emotional state driven by subconcious, not LLM generation
 - [x] **Monitoring** — a live window to peek into Eva's mind

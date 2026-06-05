@@ -30,6 +30,7 @@ from eva.subconscious.mood import MoodScorer, _update_mood
 from eva.tools import load_tools, handle_tool_error
 from eva.subconscious.mood import render_mood
 from eva.utils.feed import feed_post
+from eva.utils.format import image_uri
 
 class EvaState(TypedDict):
     messages: Annotated[List[BaseMessage], add_messages]
@@ -100,7 +101,7 @@ class Brain:
         """After tools execute, route based on tool type.
 
         Terminal tools (stay_quiet) → END (explicit choice to stop).
-        Everything else (feel, speak, etc.) → think (ReAct loop continues).
+        There could be multiple tools evocated in one run, enhance the design.
         """
         for msg in reversed(state["messages"]):
             if isinstance(msg, AIMessage) and msg.tool_calls:
@@ -147,7 +148,18 @@ class Brain:
             if people_ids:
                 self.memory.add_people_to_session(people_ids)
 
-            message = HumanMessage(content=entry.content)
+            if entry.type == "observation" and entry.metadata and "data" in entry.metadata:
+                message = HumanMessage(
+                    content=[
+                        { "type": "text", "text": entry.content },
+                        {
+                            "type": "image_url", 
+                            "image_url": {"url": entry.metadata.get("data")}
+                        }
+                    ]
+                )
+            else:
+                message = HumanMessage(content=entry.content)
 
             mood = await asyncio.to_thread(
                 self.mood_scorer.score,

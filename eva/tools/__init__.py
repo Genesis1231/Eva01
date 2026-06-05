@@ -25,7 +25,7 @@ class ToolError(Exception):
 def handle_tool_error(e: Exception) -> str:
     """Translate tool errors into first-person messages I can reason about."""
     tool = getattr(e, "tool_name", None)
-    prefix = f"My {tool}" if tool else "That tool"
+    prefix = f"My {tool} tool" if tool else "That tool"
 
     cause = e.__cause__ or e
     cause_cls = type(cause).__name__

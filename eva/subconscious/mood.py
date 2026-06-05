@@ -57,7 +57,7 @@ class MoodScorer:
     def __init__(self) -> None:
         self.initialize_mood()
         self.soul_profile: list[float] = self.initialize_soul()
-        logger.debug("MoodScorer: emotions model ready.")
+        logger.debug("MoodScorer: emotion model ready.")
 
     def initialize_mood(self) -> None:
         """Load ONNX model + tokenizer, then score SOUL.md as the trait profile."""
@@ -101,11 +101,14 @@ class MoodScorer:
 
         text = strip_sense_tag(text)
         raw = self._raw(text)
+        
         if source != "audio":
             return raw
+        
         direction = detect_direction(text)
         if direction == "contagion":
             return raw
+        
         direction_table = DIRECTED_REACTIONS if direction == "directed" else EMPATHIC_REACTIONS
         return _appraise(raw, direction_table, self.soul_profile)
 
@@ -120,11 +123,14 @@ def surfaced_emotions(
     mood: list[float] | None,
     top_k: int = RENDER_TOP_K,
 ) -> list[tuple[str, float]]:
-    """The mood's top-k non-neutral emotions that clear :data:`RENDER_THRESHOLD`,
+    """
+    The mood's top-k non-neutral emotions that clear :data:`RENDER_THRESHOLD`,
     strongest first. Shared by :func:`render_mood` (the brain's prompt block) and
-    the Room feed's ``mood_labels`` — one place for the filter/sort/threshold."""
+    the Room feed's ``mood_labels`` — one place for the filter/sort/threshold.
+    """
     if not mood:
         return []
+    
     pairs = sorted(
         ((label, p) for label, p in zip(GO_EMOTIONS_LABELS, mood)
          if label != "neutral"),

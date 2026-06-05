@@ -87,10 +87,14 @@ async def assemble(
         describer = Describer(config.VISION_MODEL)
         # face_identifier = FaceIdentifier(people_db) temply disable face ID.
         camera_sense = CameraSense(
-            describer=describer, 
-            identifier=face_identifier, 
+            describer=describer,
+            identifier=face_identifier,
             source=config.CAMERA
         )
+
+        # Share the camera with the peak tool
+        from eva.tools import peak as peak_tool
+        peak_tool.init(camera_sense)
 
     # Audio components
     speaker = Speaker(config.TTS_MODEL, config.LANGUAGE)
@@ -209,7 +213,7 @@ async def wake() -> None:
                 breathe(eva.sense_buffer, eva.brain),
                 eva.action_buffer.start_loop(),
             ]
-            print("subconcious mind:", eva.subconscious)
+
             if eva.subconscious is not None:
                 loops.append(eva.subconscious.start())
                 

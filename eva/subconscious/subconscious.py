@@ -45,7 +45,7 @@ class Subconscious:
             logger.warning("Subconscious: no camera — vision gate disabled.")
             return
 
-        logger.debug(f"Subconscious: vision gate at ~{1 / self.interval:.1f} fps")
+        logger.debug(f"Subconscious started. vision gate at ~{1 / self.interval:.1f} fps")
         while not self._stop.is_set():
             started = time.monotonic()
             try:
@@ -54,7 +54,7 @@ class Subconscious:
                 logger.error(f"Subconscious: gate error — {e}")
                 
             await self._pace(self.interval - (time.monotonic() - started))
-            print(".", end="")  # heartbeat for the gate loop
+            # print(".", end="")  # heartbeat for the gate loop
 
     async def _pace(self, remaining: float) -> None:
         """Sleep the rest of the interval, but wake immediately on stop — holds ~1 fps."""
@@ -86,20 +86,20 @@ class Subconscious:
         
         self._save_inspect(event) # keep the novel frame
         
-        description = await self.vision.describe(event.frame)
-        if not description:
-            logger.warning("Describer: Failed to describe a novel scene.")
-            description = "I saw something new, but I couldn't describe it."
+        # description = await self.vision.describe(event.frame)
+        # if not description:
+        #     logger.warning("Describer: Failed to describe a novel scene.")
+        #     description = "I saw something new, but I couldn't describe it."
         
         _, buffer = cv2.imencode('.jpg', event.frame)
         frame_uri = image_uri(buffer.tobytes(), "image/jpeg")
         
         self.sense_buffer.push(
             "observation",
-            f" I SAW SOMETHING NEW! <OBSERVATION>{description}</OBSERVATION> I WONDER WHAT THAT IS?",
+            f" I SAW SOMETHING NEW! I WONDER WHAT THAT IS?",
             metadata={
                 "level": event.level,
-                "uri": frame_uri,
+                "data": frame_uri,
             },
         )
 

@@ -8,7 +8,7 @@ from eva.utils.feed import feed_post
 def make_speak_tool(action_buffer: ActionBuffer):
     """Create a speak tool bound to the given ActionBuffer."""
 
-    @tool
+    @tool("speaker")
     async def speak(text: str) -> str:
         """Say something out loud. I use this to speak."""
         await action_buffer.put("speak", text)

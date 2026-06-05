@@ -5,8 +5,8 @@ Screen: handles visual actions (watch, etc.) from ActionBuffer.
 import webbrowser
 
 from config import logger
-from ..action_buffer import ActionBuffer, ActionEvent
-from ..base import BaseAction
+from eva.actions.action_buffer import ActionBuffer, ActionEvent
+from eva.actions.base import BaseAction
 
 class Browser(BaseAction):
     """Visual action handler — EVA's browser output."""
