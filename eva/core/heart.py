@@ -3,13 +3,18 @@ EVA's heartbeat — her autonomic layer for maintenance and self-monitoring.
 """
 
 import asyncio
+from pathlib import Path
 from urllib.parse import urlparse
 
 from config import logger
 from eva.database.db import SQLiteHandler
 
-PUBLIC_HOST = "1.1.1.1"   # coarse "am I online" egress probe target
+PROBE_HOST = "1.1.1.1"    # coarse "am I online" egress probe target
 PROBE_TIMEOUT = 3         # seconds — TCP reachability probe deadline
+
+# The Room's screenshot desk (frontend/public/tmp).
+SHOTS_DIR = Path(__file__).resolve().parents[2] / "frontend" / "public" / "tmp"
+SHOTS_KEEP = 200          # most-recent look-*.png screenshots to retain
 
 
 class Heart:
@@ -36,10 +41,11 @@ class Heart:
             await self._maintain()
 
     async def _maintain(self) -> None:
-        """Run the vitals probes, log a single status line, warn on any failure.
+        """Run the vitals probes, log a single status line, warn on any failure,
+        then run housekeeping.
 
-        A failing check never kills the beat. Future maintenance (e.g.
-        MomentDB.forget() once the moment store is wired) plugs in here.
+        A failing check never kills the beat. Periodic maintenance (the Room's
+        screenshot sweep, and future jobs like MomentDB.forget()) plugs in here.
         """
         storage, network, embedding = await asyncio.gather(
             self._check_storage(),
@@ -59,6 +65,34 @@ class Heart:
         else:
             logger.debug(f"Heart: vitals — {line}")
 
+        await self._sweep_shots()
+
+    async def _sweep_shots(self) -> None:
+        """Trim the Room's screenshot desk to the most recent SHOTS_KEEP files.
+
+        Runs the blocking file I/O off the event loop; a failure here warns but
+        never disturbs the beat.
+        """
+        def _trim() -> int:
+            if not SHOTS_DIR.exists():
+                return 0
+            shots = sorted(
+                SHOTS_DIR.glob("look-*.png"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+            stale = shots[SHOTS_KEEP:]
+            for shot in stale:
+                shot.unlink(missing_ok=True)
+            return len(stale)
+
+        try:
+            removed = await asyncio.to_thread(_trim)
+            if removed:
+                logger.debug(f"Heart: swept {removed} stale screenshot(s)")
+        except Exception as e:
+            logger.warning(f"Heart: screenshot sweep failed — {e}")
+
     @staticmethod
     def _mark(result) -> str:
         """Render a check outcome: True→ok, False/error→down, None→off (skipped)."""
@@ -74,7 +108,7 @@ class Heart:
 
     async def _check_network(self) -> bool:
         """Internet Check — can we reach the public internet?"""
-        return await self._reachable(PUBLIC_HOST, 443)
+        return await self._reachable(PROBE_HOST, 443)
 
     async def _check_embedding(self) -> bool | None:
         """The local embedding server is listening. Skipped if not configured."""

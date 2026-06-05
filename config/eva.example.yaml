@@ -31,7 +31,7 @@ system:
   camera: 0
 
   # Heartbeat interval in seconds. off/0 = disabled.
-  heartbeat: 60
+  heartbeat: 600
 
   # Room feed endpoint — Eva POSTs her mood/senses/speech/artifacts here for the
   # frontend Room to display. Empty = disabled (headless, no Room).

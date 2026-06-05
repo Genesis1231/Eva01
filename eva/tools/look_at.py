@@ -21,7 +21,6 @@ _VISION_SIZE = (800, 500)
 # Where screenshots land so the Room can show them. frontend/public/ is served by
 # Vite at the web root, so a file here is reachable at /tmp/<name>. 
 _TMP_DIR = Path(__file__).resolve().parents[2] / "frontend" / "public" / "tmp"
-_KEEP_SHOTS = 200
 
 
 def _pick_browser() -> str:
@@ -31,13 +30,6 @@ def _pick_browser() -> str:
         if path:
             return path
     raise RuntimeError("No Chrome/Chromium binary found in PATH.")
-
-def _prune_shots() -> None:
-    """Keep only the most recent _KEEP_SHOTS screenshots so the served folder stays bounded."""
-    shots = sorted(_TMP_DIR.glob("look-*.png"), key=lambda p: p.stat().st_mtime, reverse=True)
-    for stale in shots[_KEEP_SHOTS:]:
-        stale.unlink(missing_ok=True)
-
 
 def _screenshot(url: str) -> tuple[bytes, str] | None:
     """Take a viewport screenshot, save it under a unique name in the Room's served folder,
@@ -74,7 +66,6 @@ def _screenshot(url: str) -> tuple[bytes, str] | None:
     if not png_path.exists():
         logger.error("Screenshot file not found — failed to look at image.")
         return None
-    _prune_shots()
 
     img = Image.open(png_path)
     img = img.resize(_VISION_SIZE, Image.Resampling.LANCZOS)
