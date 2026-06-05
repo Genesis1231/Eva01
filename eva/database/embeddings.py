@@ -81,6 +81,12 @@ class QwenVLEmbedding:
             return None
         return array / (np.linalg.norm(array, axis=1, keepdims=True) + 1e-9)
 
+    async def aclose(self) -> None:
+        """Close the httpx async client (lazily created in `_aclient`)."""
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None
+
 
 class GeminiEmbedding:
     """Cloud Gemini Embedding 2: text + image embeddings (Matryoshka, default 768-d)."""
@@ -127,6 +133,9 @@ class GeminiEmbedding:
 
     async def patch(self, image: bytes, mime: str) -> np.ndarray | None:
         return None  # Gemini has no patch-feature endpoint
+
+    async def aclose(self) -> None:
+        pass  # the google-genai client needs no explicit async close
 
 
 class EmbeddingEngine:
@@ -251,7 +260,7 @@ class EmbeddingEngine:
             logger.warning(f"EmbeddingEngine: {self.provider} image embedding failed - {e}")
             return None
 
-    async def patch(self, image: bytes, mime: str = "image/jpeg") -> np.ndarray | list[float] | None:
+    async def patch(self, image: bytes, mime: str = "image/jpeg") -> np.ndarray | None:
         """Return the raw (PP, FD) patch-token grid for an encoded image, or None when unsupported/failing."""
         
         if not self._enabled or not self._embedding or not image:
@@ -259,11 +268,16 @@ class EmbeddingEngine:
             return None
         
         if not self._supports_patches:
-            # returns embeddings if patches are not supported.
-            return await self._embedding.embed_image(image, mime)
+            return None
         
         try:
             return await self._embedding.patch(image, mime)
         except Exception as e:
             logger.warning(f"EmbeddingEngine: {self.provider} patch failed - {e}")
             return None
+
+    async def aclose(self) -> None:
+        """Close the underlying embedding client. Safe when disabled/uninitialized — the owner
+        (assemble/wake) calls this once at shutdown; borrowers (e.g. the vision gate) must not."""
+        if self._embedding is not None:
+            await self._embedding.aclose()

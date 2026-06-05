@@ -1,8 +1,5 @@
 """
 EVA's mind.
-
-Three concurrent components sharing two buffers:
-    Senses  →  SenseBuffer  →  Brain  →  ActionBuffer  →  Actions
 """
 
 import asyncio
@@ -18,6 +15,9 @@ from .people import PeopleDB
 from .journal import JournalDB
 from .tasks import TaskDB
 from .heart import Heart
+from eva.subconscious.subconscious import Subconscious
+from eva.subconscious._vision.detector import VisionDetector
+from eva.subconscious._vision.recognition import RecognitionMemory
 from eva.senses.sense_buffer import SenseBuffer
 from eva.senses.audio.audio_sense import AudioSense
 from eva.senses.audio.transcriber import Transcriber
@@ -43,7 +43,9 @@ class Assembly:
     heart: Heart
     motor_system: MotorSystem
     audio_sense: AudioSense
+    embedder: EmbeddingEngine
     camera_sense: CameraSense | None = None
+    subconscious: Subconscious | None = None
 
 async def assemble(
     config: Config,
@@ -123,9 +125,6 @@ async def assemble(
     )
     audio_sense.start(sense_buffer)
 
-    if camera_sense is not None and camera_sense.is_available:
-        camera_sense.start(sense_buffer)
-
     # Brain — owns tools + workflow, Cortex owns LLM + prompt
     brain = Brain(
         model_name=config.MAIN_MODEL,
@@ -137,8 +136,29 @@ async def assemble(
 
     # Heartbeat — autonomic vitals (storage / connectivity / embedding server)
     heart = Heart(db, config.HEARTBEAT_INTERVAL, embedding_url=config.EMBEDDING_URL)
-    
-    
+
+    # Subconscious — the always-on visual-novelty gate (a concurrent peer of breathe).
+    subconscious = None
+    if camera_sense and camera_sense.is_available and embedder.enabled:
+        session_dir = DATA_DIR / "session"
+        recognition_memory = await RecognitionMemory.seed(
+            prior_stream = session_dir / "stream",
+            cache_path = session_dir / "seed_embed.npy",
+            engine = embedder,
+        )
+
+        vision_detector = VisionDetector(
+            l2 = recognition_memory,
+            engine = embedder
+        )
+
+        subconscious = Subconscious(
+            sense_buffer,
+            camera_sense,
+            vision_detector,
+            inspect_dir=session_dir / "inspects",
+        )
+
     return Assembly(
         sense_buffer=sense_buffer,
         action_buffer=action_buffer,
@@ -146,7 +166,9 @@ async def assemble(
         heart=heart,
         motor_system=motor_system,
         audio_sense=audio_sense,
+        embedder=embedder,
         camera_sense=camera_sense,
+        subconscious=subconscious,
     )
 
 
@@ -180,20 +202,26 @@ async def wake() -> None:
 
         try:
             await eva.motor_system.start()
-            await asyncio.gather(
+            loops = [
                 eva.heart.start(),
                 breathe(eva.sense_buffer, eva.brain),
                 eva.action_buffer.start_loop(),
-            )
+            ]
+            if eva.subconscious is not None:
+                loops.append(eva.subconscious.start())
+            await asyncio.gather(*loops)
         except (KeyboardInterrupt, asyncio.CancelledError):
             pass
         finally:
             await eva.brain.shutdown()
 
             eva.audio_sense.stop()
-            if eva.camera_sense is not None:
-                await eva.camera_sense.stop()
+            if eva.subconscious is not None:
+                await eva.subconscious.stop()      # also releases the camera
+            elif eva.camera_sense is not None:
+                eva.camera_sense.release()
 
+            await eva.embedder.aclose()
             await eva.motor_system.shutdown()
             await eva.action_buffer.stop()
             await eva_db.close_all()

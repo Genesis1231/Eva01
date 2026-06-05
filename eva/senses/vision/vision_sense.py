@@ -8,21 +8,11 @@ import cv2
 from eva.senses.vision.describer import Describer
 from eva.senses.vision.face_identifier import FaceIdentifier
 from eva.senses.vision.webcam import Webcam
-from eva.senses.sense_buffer import SenseBuffer
 
 
 class CameraSense:
-    """Background vision — EVA's eyes.
+    """EVA's eyes — a passive vision faculty: capture, describe, identify on demand."""
 
-    Continuously captures frames, detects scene changes,
-    and writes descriptions to a shared input buffer.
-    """
-
-    _PIXEL_DIFF_THRESHOLD = 10 # The threshold for detecting significant pixel differences.
-    _CHANGE_THRESHOLD = 0.4 # The threshold for detecting significant scene changes.
-    _GLANCE_INTERVAL = 5.0 # The interval between camera glances, adjusted to balance performance.
-    _COMPRESSED_SIZE = (320, 240) # The size of the image to be processed.
-    
     def __init__(
         self,
         describer: Describer,
@@ -38,136 +28,32 @@ class CameraSense:
         self.identifier = identifier
         self.webcam = Webcam(source)
 
-        self._previous_frame: np.ndarray | None = None
-        self._stop_event = asyncio.Event()
-        self._task: asyncio.Task | None = None
-
     @property
     def is_available(self) -> bool:
         return self.webcam.camera is not None
 
-    def start(self, buffer: SenseBuffer) -> None:
-        """Start the background vision task, writing observations to buffer."""
-        if self.webcam.camera is None:
-            logger.warning("CameraSense: No camera — skipping vision.")
-            return
-        if self._task is not None and not self._task.done():
-            logger.warning("CameraSense: Already running.")
-            return
+    def capture_photo(self) -> np.ndarray:
+        """Grab a single frame. Sync/blocking cv2"""
+        return self.webcam.capture_photo()
 
-        self._stop_event.clear()
-        self._task = asyncio.create_task(self._run(buffer))
-        logger.debug("CameraSense: Started.")
+    async def describe(self, frame: np.ndarray, names: list[str] | None = None) -> str | None:
+        """Describe a frame with the vision model. """
+        return await self.describer.describe(frame, names=names)
 
-    async def stop(self) -> None:
-        """Stop the vision task and release resources."""
-        if self._task is None:
-            self._release()
-            return
-
-        if self._task.done():
-            self._task = None
-            self._release()
-            return
-
-        logger.debug("CameraSense: Stopping...")
-        self._stop_event.set()
-        try:
-            await self._task
-        finally:
-            self._task = None
-            self._release()
-        logger.debug("CameraSense: Stopped.")
-
-    def _release(self) -> None:
-        """Release webcam and vision models."""
-        self.webcam.release()
-        if self.identifier:
-            self.identifier.close()
-
-    async def _run(self, buffer: SenseBuffer) -> None:
-        """Main loop: capture -> detect change -> describe -> write to buffer."""
-
-        while not self._stop_event.is_set():
-            try:
-                frame = await asyncio.to_thread(self.webcam.capture_photo)
-
-                if self._has_scene_changed(frame):
-                    logger.debug("CameraSense: Scene change detected, observing...")
-                    observation, face_ids = await self._observe(frame)
-
-                    if observation:
-                        metadata = {"faces": face_ids} if face_ids else None
-                        buffer.push("observation", observation, metadata=metadata)
-                        logger.debug(f"CameraSense: {observation}...")
-
-            except Exception as e:
-                logger.error(f"CameraSense: Capture loop error — {e}")
-
-            try:
-                await asyncio.wait_for(self._stop_event.wait(), timeout=self._GLANCE_INTERVAL)
-            except asyncio.TimeoutError:
-                pass
-
-        logger.debug("CameraSense: Capture loop stopped.")
-
-    def _has_scene_changed(self, frame: np.ndarray) -> bool:
-        """Motion detection via grayscale pixel diff."""
-        # Resize first for efficiency and noise reduction
-        small = cv2.resize(frame, self._COMPRESSED_SIZE)
-        gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
-
-        if self._previous_frame is None:
-            self._previous_frame = gray
-            return True
-
-        diff = cv2.absdiff(gray, self._previous_frame)
-        changed_pixels = np.count_nonzero(diff > self._PIXEL_DIFF_THRESHOLD)
-        change_ratio = changed_pixels / diff.size
-        self._previous_frame = gray
-
-        return change_ratio > self._CHANGE_THRESHOLD
-
-    async def _observe(self, frame: np.ndarray) -> tuple[str, List[str]]:
-        """Identify faces first, then describe scene with names for coherent output.
-
-        Returns (observation_text, face_ids) — face_ids are PeopleDB IDs for recognized faces.
-        """
-
-        # Step 1: Identify faces (fast, ~65ms)
-        try:
-            faces = await self._identify(frame)
-        except Exception as e:
-            logger.error(f"CameraSense: Identification error — {e}")
-            faces = []
-
-        # Extract names for the describer
-        face_names = [f["name"] for f in faces] if faces else None
-        face_ids = [f["id"] for f in faces if f.get("id")]
-
-        # Step 2: Describe scene with identified names (slow, network I/O)
-        try:
-            description = await self._describe(frame, names=face_names)
-        except Exception as e:
-            logger.error(f"CameraSense: Description error — {e}")
-            description = None
-
-        observation = f"<OBSERVATION>{description}</OBSERVATION>" if description else ""
-        return observation, face_ids
-
-    async def _describe(self, frame: np.ndarray, names: list[str] | None = None) -> str | None:
-        """Describe frame using vision model (async network I/O)."""
-        resized = cv2.resize(frame, self._COMPRESSED_SIZE)
-        return await self.describer.describe(resized, names=names)
-
-    async def _identify(self, frame: np.ndarray) -> List[Dict]:
-        """Identify faces in frame (CPU-bound via thread pool)."""
+    async def identify(self, frame: np.ndarray) -> List[Dict]:
+        """Identify faces in a frame. Empty list when no identifier."""
         if self.identifier is None:
             return []
         return await asyncio.to_thread(self.identifier.identify, frame)
 
+    def release(self) -> None:
+        """Release the webcam and vision models."""
+        self.webcam.release()
+        if self.identifier:
+            self.identifier.close()
+
     def capture(self, save_path: str) -> None:
-        """On-demand photo capture (for face registration etc)."""
+        """On-demand photo capture to disk (for face registration etc)."""
         try:
             frame = self.webcam.capture_photo()
             path = Path(save_path)

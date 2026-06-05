@@ -1,6 +1,6 @@
 """L2 long-term recognition — a budget-capped bank of NORMAL pooled embeddings + a route threshold.
 
-Pure STORAGE; representation + scorer are `features.embed` / `features.embed_novelty`. Admission is
+representation + scorer are `features.embed` / `features.embed_novelty`. Admission is
 score-gated (MemStream, WWW'22): only frames recognised as normal contribute, so anomalies never
 poison "normal". When full, a new embedding overwrites a uniformly-random slot — random-replacement
 forgetting: an exponential, recency-biased decay (not FIFO's hard cliff), and since recurring normals
@@ -10,13 +10,17 @@ SLOW half of a two-timescale forgetting model (L1's recency ring is the fast hal
 moments) is the eva mainframe's job, not this module's.
 
 Route threshold = held-out null: a bank self-matches its in-sample frames, so a build/calibration
-split (not leave-one-out) is the right null — score held-out normal frames vs the bank, take p95."""
+split (not leave-one-out) is the right null — score held-out normal frames vs the build split, take
+p95. The holdout then rejoins the bank (the bank is all normal frames; the split is calibration-only)."""
 
+from collections import deque
 from pathlib import Path
+
 import numpy as np
 
 from config import logger
 from .features import as_vector, embed_novelty
+
 
 class RecognitionMemory:
     """L2 recognition: a budget-capped bank of NORMAL pooled embeddings + a route threshold."""
@@ -25,10 +29,33 @@ class RecognitionMemory:
     NUM_PRIOR = 200                # prior-session NORMAL frames that seed the bank
     NULL_PERCENTILE = 95           # route threshold = held-out p95 of normal long_nov
     HELDOUT_FRACTION = 0.2         # fraction of seed frames reserved for calibration
+    
+    THRESHOLD_WINDOW = 512         # rolling presumed-normal scores for runtime recalibration
+    THRESHOLD_MIN_SCORES = 20      # keep tiny cold-start samples from immediately dominating
+    THRESHOLD_FLOOR = 0.1          # flood-guard 
 
-    def __init__(self, rows: np.ndarray, threshold: float, random_generator: np.random.Generator):
+    def __init__(
+        self,
+        rows: np.ndarray,
+        threshold: float,
+        random_generator: np.random.Generator,
+        cache_path: Path,
+        threshold_scores: np.ndarray | list[float] | None = None,
+    ):
         self.threshold = threshold
         self.random_generator = random_generator
+        self.cache_path = cache_path
+        
+        if threshold_scores is not None:
+            scores = np.ravel(threshold_scores)
+            scores = scores[np.isfinite(scores)].tolist()
+        else:
+            scores = []
+            
+        self._threshold_scores = deque(scores[-self.THRESHOLD_WINDOW:], maxlen=self.THRESHOLD_WINDOW)
+        if len(self._threshold_scores) >= self.THRESHOLD_MIN_SCORES:
+            self._refresh_threshold()
+        
         self._count = len(rows)
         if self._count:
             self._buffer = np.empty((self.L2_BUDGET, rows.shape[1]), dtype=np.float32)
@@ -45,7 +72,7 @@ class RecognitionMemory:
     @property
     def count(self):
         return self._count
-    
+
     @classmethod
     async def seed(cls, prior_stream: Path, cache_path: Path, engine) -> "RecognitionMemory":
         """Build the recognition bank from a prior session of NORMAL frames (embedded, cached)."""
@@ -54,35 +81,50 @@ class RecognitionMemory:
         frames = await cls._cached_embeddings(prior_stream, cache_path, engine)
 
         if not frames:
-            logger.warning("WARN: no prior-session frames — starting with an empty recognition bank.")
-            return cls(np.empty((0, 0), dtype=np.float32), float("inf"), random_generator)
+            logger.warning("WARN: no prior-session data, starting with an empty recognition bank.")
+            return cls(
+                rows=np.empty((0, 0), dtype=np.float32),
+                threshold=float("inf"),
+                random_generator=random_generator,
+                cache_path=cache_path
+            )
 
-        if len(frames) < 10:
+        if len(frames) < 20:
             logger.warning(f"WARN: tiny seed ({len(frames)} frames) — threshold will be noisy.")
-        order = random_generator.permutation(len(frames))
         
+        order = random_generator.permutation(len(frames))
+
         # Guard against small counts: ensure at least 1 holdout, leave the rest for build
         ideal_holdout = max(3, int(cls.HELDOUT_FRACTION * len(frames)))
         num_holdout = min(ideal_holdout, max(0, len(frames) - 1))
-        
-        holdout = [frames[i] for i in order[:num_holdout]]
-        build = [frames[i] for i in order[num_holdout:]] or frames   # never let the bank be empty
-        rows = np.vstack(build)
 
-        if len(rows) > cls.L2_BUDGET:
-            rows = rows[random_generator.choice(len(rows), cls.L2_BUDGET, replace=False)]
+        holdout = [frames[i] for i in order[:num_holdout]]
+        build = [frames[i] for i in order[num_holdout:]] or frames   # calibration reference, never empty
+        build_rows = np.vstack(build)
 
         if holdout:
-            null_scores = np.array([embed_novelty(held_out, rows) for held_out in holdout])
+            # out-of-sample null: score held-out NORMAL frames vs the build split
+            null_scores = np.array([embed_novelty(held_out, build_rows) for held_out in holdout])
             threshold = float(np.percentile(null_scores, cls.NULL_PERCENTILE))
         else:
             # Fallback if we only had 1 sample and couldn't create a held-out split
+            null_scores = None
             threshold = float('inf')
+
+        rows = np.vstack(frames)
+        if len(rows) > cls.L2_BUDGET:
+            rows = rows[random_generator.choice(len(rows), cls.L2_BUDGET, replace=False)]
 
         logger.debug(f"recognition bank: {len(rows)} embeddings, "
                      f"threshold (long_nov > {threshold:.3f} = held-out p{cls.NULL_PERCENTILE})")
 
-        return cls(rows, threshold, random_generator)
+        return cls(
+            rows=rows,
+            threshold=threshold,
+            random_generator=random_generator,
+            cache_path=cache_path,
+            threshold_scores=null_scores,
+        )
 
     @staticmethod
     async def _cached_embeddings(prior_stream: Path, cache_path: Path, engine) -> list:
@@ -90,14 +132,21 @@ class RecognitionMemory:
 
         cache_path = cache_path.with_suffix(".npy")
         if cache_path.exists():
-            cached = np.load(cache_path)
+            cached = np.load(cache_path).astype(np.float32)
             logger.debug(f"seed: cache hit ({len(cached)} prior-session frames)")
-            # re-normalise on load: a float16 cache is rounded + denormalised, so a warm seed would
-            # otherwise drift from the float32 cold seed that wrote it.
-            return [v / (np.linalg.norm(v) + 1e-9) for v in cached.astype(np.float32)]
+            # Tolerate both on-disk layouts — legacy (N, 1, D) from np.stack and the (N, D) that
+            # save() writes — and yield (1, D) rows (what seed/embed_novelty expect). Re-normalise
+            # per row: a float16 cache is rounded/denormalised, so a warm seed would otherwise drift.
+            rows = cached.reshape(cached.shape[0], -1)
+            # Normalize the whole matrix at once along axis 1
+            rows = rows / (np.linalg.norm(rows, axis=1, keepdims=True) + 1e-9)
+
+            return [row[None, :] for row in rows]
 
         frame_paths = sorted(prior_stream.glob("*.jpg"))
-        picked = frame_paths[:: max(1, len(frame_paths) // RecognitionMemory.NUM_PRIOR)][:RecognitionMemory.NUM_PRIOR]
+        # Evenly space indices and pick them
+        indices = np.linspace(0, len(frame_paths) - 1, min(len(frame_paths), RecognitionMemory.NUM_PRIOR), dtype=int)
+        picked = [frame_paths[i] for i in indices]
         logger.debug(f"seeding from {len(picked)} prior-session frames...")
 
         embeddings = []
@@ -105,19 +154,42 @@ class RecognitionMemory:
             vector = as_vector(await engine.embed_image(path.read_bytes()))
             if vector is not None:
                 embeddings.append(vector)
+        
         if embeddings:
-            np.save(cache_path, np.stack(embeddings).astype(np.float32))   # float32: warm seed == cold seed
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            np.save(cache_path, np.vstack(embeddings).astype(np.float32))  # (N, D); warm seed == cold seed
+        
         return embeddings
 
-    def score(self, query: np.ndarray) -> float:
-        """Novelty of `query` (this frame's pooled embedding) vs the bank. 0.0 if the bank is empty —
-        the guard is load-bearing: embed_novelty's `reference @ query[0]` throws on empty rows."""
+    def score(self, frame: np.ndarray) -> float:
+        """Novelty of this frame's pooled embedding vs the bank. Higher = more novel. """
         if self._count == 0:
             return 0.0
-        return embed_novelty(query, self.rows)
+        return embed_novelty(frame, self.rows)
+
+    def observe_calibration_score(self, score: float) -> None:
+        """Recalibrate the route threshold from a presumed-normal observation. The caller MUST feed
+        this BEFORE the `<= threshold` admit gate: a sample censored at the current threshold
+        estimates p95 from below its own value, so iterating it ratchets the threshold down to the
+        minimum normal score (a censored sample has no stable fixed point)."""
+        
+        if np.isfinite(score):
+            self._threshold_scores.append(float(score))
+            self._refresh_threshold()
+
+    def _refresh_threshold(self) -> None:
+        if len(self._threshold_scores) >= self.THRESHOLD_MIN_SCORES:
+            p95 = float(np.percentile(self._threshold_scores, self.NULL_PERCENTILE))
+            self.threshold = max(self.THRESHOLD_FLOOR, p95)
+
+    def save(self) -> None:
+        """Persist the current bank as the next session's warm-seed cache."""
+        if self._count:
+            self.cache_path.parent.mkdir(parents=True, exist_ok=True)
+            np.save(self.cache_path, self.rows.astype(np.float32))
 
     def admit(self, query: np.ndarray) -> None:
-        """Admit query embedding(s) in-place — no allocation once live."""
+        """Admit query embedding(s) in-place. random choice replacement if necessary."""
 
         n_new = len(query)
         if self._buffer is None:
@@ -136,5 +208,3 @@ class RecognitionMemory:
             n = min(len(query), self.L2_BUDGET)
             idxs = self.random_generator.choice(self.L2_BUDGET, n, replace=False)
             self._buffer[idxs] = query[:n]
-
-
