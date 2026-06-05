@@ -1,10 +1,5 @@
 """
 eva/utils/feed.py — Eva's outward feed: she posts text to the Room.
-
-`feed_post` is fire-and-forget: it schedules the POST and returns immediately, so
-a slow or absent Room can't block Eva's reasoning. For kind="mood", pass the raw
-mood vector — the display labels are rendered here, and an unchanged mood is
-skipped (so re-posting the same mood every reasoning step doesn't spam the Room).
 """
 
 import asyncio
@@ -14,8 +9,7 @@ from config import logger, eva_configuration
 from eva.subconscious.mood import surfaced_emotions
 
 _feed_client: httpx.AsyncClient | None = None
-_tasks: set[asyncio.Task] = set()
-_last_mood: str | None = None
+_feed_tasks: set[asyncio.Task] = set()
 
 
 def mood_labels(mood: list[float] | None, top_k: int = 3) -> str:
@@ -35,18 +29,14 @@ async def _post(kind: str, text: str) -> None:
 
 
 def feed_post(kind: str, text) -> None:
-    """Fire-and-forget post to the Room — never blocks the caller, never raises.
-    No-op when the feed is disabled (empty FEED_URL). For kind="mood", `text` is
-    the raw mood vector: rendered to labels here, and skipped if unchanged.
-    Call from within the running event loop (Eva's spine)."""
+    """Fire-and-forget post to the Room"""
+    
     if not eva_configuration.FEED_URL:
         return
+    
     if kind == "mood":
         text = mood_labels(text)
-        global _last_mood
-        if text == _last_mood:
-            return  # mood unchanged since last post — don't re-post every think
-        _last_mood = text
+    
     task = asyncio.create_task(_post(kind, text))
-    _tasks.add(task)  # hold a ref so the task can't be GC'd mid-flight
-    task.add_done_callback(_tasks.discard)
+    _feed_tasks.add(task)
+    task.add_done_callback(_feed_tasks.discard)
