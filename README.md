@@ -202,9 +202,9 @@ models:
   utility: "openai:gpt-4o-mini"
 
   # Multimodal embedding model — powers semantic memory and the vision novelty gate.
-  # "qwenvl:<model>" runs on a local server (free); "gemini:<model>" is cloud.
-  embedding: "qwenvl:Qwen3-VL-Embedding-8B"
-  embedding_url: "http://localhost:8000"   # used by the qwenvl provider
+  # "alibaba<model>" runs on a local server (free); "google:<model>" is cloud.
+  embedding: "alibaba:Qwen3-VL-Embedding-8B"
+  embedding_url: "http://localhost:8000"   # local server
 ```
 
 Notes:

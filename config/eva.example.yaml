@@ -28,7 +28,7 @@ system:
   #   off            : disable camera entirely
   #   0              : local webcam (device index)
   #   "http://..."   : network stream URL
-  camera: off
+  camera: 0
 
   # Heartbeat interval in seconds. off/0 = disabled.
   heartbeat: 60
@@ -62,8 +62,9 @@ models:
   utility: "deepseek:deepseek-chat"
 
   # The multimodal embedding model for EVA's semantic memory + vision (text + image + patch).
-  # "qwenvl:<model>" — local server (free, multimodal, default); "gemini:<model>" — cloud.
-  embedding: "qwenvl:Qwen3-VL-Embedding-8B"
+  # "alibaba:Qwen3-VL-Embedding-2B" — local server (Qwen3-VL-Embedding-8B recommended).; 
+  # "google:gemini-embedding-2" — cloud ()
+  embedding: "alibaba:Qwen3-VL-Embedding-2B"
 
   # The embedding server URL (used by the qwenvl provider; gemini ignores it).
   embedding_url: "http://localhost:8000"

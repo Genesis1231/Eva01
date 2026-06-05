@@ -1,9 +1,9 @@
 """Eva's embedding engine — one async facade over her multimodal embedding model(s).
 
 Two swappable providers, selected by a `provider:model` spec:
-    "qwenvl:Qwen3-VL-Embedding-8B"   — local server: text + image embeddings AND the raw
+    "alibaba:Qwen3-VL-Embedding-8B"   — local server: text + image embeddings AND the raw
                                        patch-token grid (the vision L1 signal). Default.
-    "gemini:gemini-embedding-2"      — cloud Gemini Embedding 2: text + image embeddings (no patch).
+    "google:gemini-embedding-2"      — cloud Gemini Embedding 2: text + image embeddings (no patch).
 
 """
 
@@ -190,9 +190,9 @@ class EmbeddingEngine:
     def init_model(self) -> None:
         """Initialize the provider. Never raises; disables on failure (dead server, missing dep)."""
         try:
-            if self.provider == "qwenvl":
+            if self.provider == "alibaba":
                 self._embedding = QwenVLEmbedding(self.model, base_url=self.base_url)
-            elif self.provider == "gemini":
+            elif self.provider == "google":
                 self._embedding = GeminiEmbedding(self.model)
             else:
                 raise ValueError(f"Unsupported embedding provider: {self.provider}")
