@@ -16,6 +16,9 @@ PROBE_TIMEOUT = 3         # seconds — TCP reachability probe deadline
 SHOTS_DIR = Path(__file__).resolve().parents[2] / "frontend" / "public" / "tmp"
 SHOTS_KEEP = 200          # most-recent look-*.png screenshots to retain
 
+ # LangGraph checkpointer store (under DATA_DIR/database/)
+GRAPH_DB = "eva_graph.db" 
+
 
 class Heart:
 
@@ -45,7 +48,7 @@ class Heart:
         then run housekeeping.
 
         A failing check never kills the beat. Periodic maintenance (the Room's
-        screenshot sweep, and future jobs like MomentDB.forget()) plugs in here.
+        screenshot sweep, and future jobs like memory consolidation) plugs in here.
         """
         storage, network, embedding = await asyncio.gather(
             self._check_storage(),
@@ -63,8 +66,9 @@ class Heart:
         if "down" in vitals.values():
             logger.warning(f"Heart: vitals — {line}")
         else:
-            logger.debug(f"Heart: vitals — {line}")
+            logger.info(f"Heart: vitals — {line}")
 
+        await self._log_checkpoints()
         await self._sweep_shots()
 
     async def _sweep_shots(self) -> None:
@@ -92,6 +96,36 @@ class Heart:
                 logger.debug(f"Heart: swept {removed} stale screenshot(s)")
         except Exception as e:
             logger.warning(f"Heart: screenshot sweep failed — {e}")
+
+    async def _log_checkpoints(self) -> None:
+        """Log how many LangGraph checkpoints this session holds, and in total.
+
+        A checkpoint is roughly one reasoning super-step. The current session is the
+        newest thread_id (they're time-stamped). Reads LangGraph's internal
+        `checkpoints` table; any failure (missing DB, schema change) is swallowed so
+        the beat is never disturbed.
+        """
+        try:
+            total = await self.db.fetchone(
+                "SELECT count(*) AS ckpts, count(DISTINCT thread_id) AS sessions "
+                "FROM checkpoints",
+                db_name=GRAPH_DB,
+            )
+            session = await self.db.fetchone(
+                "SELECT count(*) AS ckpts FROM checkpoints "
+                "WHERE thread_id = (SELECT max(thread_id) FROM checkpoints)",
+                db_name=GRAPH_DB,
+            )
+        except Exception as e:
+            logger.debug(f"Heart: checkpoint stats unavailable — {e}")
+            return
+
+        if not total or not session:
+            return
+        logger.info(
+            f"Heart: {session['ckpts']} checkpoints in current session · "
+            f"total {total['ckpts']} / {total['sessions']}"
+        )
 
     @staticmethod
     def _mark(result) -> str:

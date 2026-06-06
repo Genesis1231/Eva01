@@ -35,11 +35,14 @@ class SpeechWindow:
 
     def current(self) -> str:
         """The agent-state text: recent speech (content-only, role-marked), or 'quiet' when idle."""
+        
         cutoff = time.monotonic() - self._window_seconds
         while self._frags and self._frags[0][0] < cutoff:
             self._frags.popleft()
-        frags = list(self._frags)                               # snapshot before joining
+        frags = list(self._frags)
+        
         if not frags:
             return SENTINEL
         text = "\n".join(f"{role}: {said}" for _, role, said in frags)
+        
         return text[-self._max_chars:] if len(text) > self._max_chars else text

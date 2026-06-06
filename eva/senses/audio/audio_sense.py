@@ -46,6 +46,7 @@ class AudioSense:
         speaker_identifier: Optional[SpeakerIdentifier] = None,
         on_interrupt: Optional[Callable[[], None]] = None,
         is_speaking: Optional[Callable[[], bool]] = None,
+        on_transcript: Optional[Callable[[str], None]] = None,
     ) -> None:
         """
         Args:
@@ -53,11 +54,14 @@ class AudioSense:
             speaker_identifier: Optional SpeakerIdentifier for voice recognition.
             on_interrupt: Optional sync callback to stop current speech.
             is_speaking:  Optional callable returning True if EVA is speaking.
+            on_transcript: Optional sync tap fed each transcript (e.g. the
+                subconscious SpeechWindow). Called from the process thread.
         """
         self.transcriber = transcriber or Transcriber()
         self._speaker_id = speaker_identifier
         self._on_interrupt = on_interrupt
         self._is_speaking = is_speaking
+        self._on_transcript = on_transcript
         self._mic = Microphone()
         self._keyboard = True
         # Audio queues
@@ -206,6 +210,12 @@ class AudioSense:
                     )
                     buffer.push("audio", content, metadata=metadata)
                     logger.debug(f"AudioSense: pushed audio text — {content}")
+
+                    if self._on_transcript:
+                        try:
+                            self._on_transcript(content)
+                        except Exception as e:
+                            logger.warning(f"AudioSense: transcript tap failed — {e}")
                 else:
                     logger.warning("AudioSense: no speech detected")
             except Exception as e:

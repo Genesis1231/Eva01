@@ -11,7 +11,6 @@ Constants need live calibration — text novelty runs on a higher scale than pat
 
 from collections import deque
 from dataclasses import dataclass
-
 import numpy as np
 
 from .window import SpeechWindow, SENTINEL
@@ -43,8 +42,7 @@ class SpeechDetector:
         self._history: deque[float] = deque(maxlen=Z_WINDOW)
 
     async def observe(self) -> SpeechView | None:
-        """Embed the current agent-state text and score its recent-novelty. None when idle ('quiet')
-        or the embed failed — so the caller can skip cheaply."""
+        """Embed the current agent-state text and score its recent-novelty. """
         text = self.window.current()
         if text == SENTINEL:
             return None

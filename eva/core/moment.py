@@ -6,11 +6,12 @@ alone can light the whole moment back up.
 
 The keys are precomputed vectors handed in by the novelty gate's encoder — MomentDB
 never embeds; it stores each modality's key in its own pure VectorIndex and keeps the
-moment's mutable state (note, activation, fidelity) in the `moments` table. The LLM
-impression/importance call and note compaction live one layer up (as MemoryDB sits
-over JournalDB).
+moment's mutable state (note, activation) in the `moments` table. The LLM
+impression/importance call lives one layer up (as MemoryDB sits over JournalDB).
 
-  remember → recall → reinforce → forget
+  remember → recall → reinforce
+  (forgetting is retrieval failure, not data loss: nothing is deleted — stale moments
+   just stop surfacing as activation × recency sinks in the recall ranking)
 """
 
 import math
@@ -25,7 +26,6 @@ from eva.database.vector_index import VectorIndex
 _RECENCY_HALF_LIFE_DAYS = 7.0   # a moment's pull halves after a week without recall
 _RECENCY_FLOOR = 0.1            # ...but never to nothing — a vivid one-off persists
 _REINFORCE_GAIN = 0.3          # recall bump: activation += (1-activation)*gain (→ 1.0)
-_FORGET_FLOOR = 0.05           # effective strength below this → tombstone (note cleared, keys kept)
 
 
 @dataclass
@@ -42,7 +42,8 @@ def _now() -> str:
 
 
 class MomentDB:
-    """Lifelong perceptual episodic memory: remember → recall → reinforce → forget."""
+    """Lifelong perceptual episodic memory: remember → recall → reinforce.
+    Nothing is deleted — forgetting lives in the recall ranking, not the data."""
 
     def __init__(self, db: SQLiteHandler):
         self._db = db
@@ -60,7 +61,6 @@ class MomentDB:
                 created_at       TIMESTAMP,
                 last_recalled_at TIMESTAMP,
                 activation       REAL,
-                fidelity         TEXT,      -- 'full' | 'tombstone'
                 related_id       TEXT
             )
         """)
@@ -70,18 +70,22 @@ class MomentDB:
     async def remember(
         self, note: str, img_key, txt_key, importance: float, related_id: str | None = None
     ) -> str:
-        """Store a new moment. `importance` (her felt weight) seeds activation."""
+        """Store a new moment. `importance` (her felt weight) seeds activation. Either key may be
+        None — a silent moment is an image alone (and vice versa); it's simply not cued on that
+        channel."""
         moment_id = uuid.uuid4().hex[:12]
         now = _now()
         try:
             await self._db.execute(
                 """INSERT INTO moments
-                (id, note, created_at, last_recalled_at, activation, fidelity, related_id)
-                VALUES (?, ?, ?, ?, ?, 'full', ?)""",
+                (id, note, created_at, last_recalled_at, activation, related_id)
+                VALUES (?, ?, ?, ?, ?, ?)""",
                 (moment_id, note, now, now, float(importance), related_id),
             )
-            await self._img.upsert(moment_id, img_key)
-            await self._txt.upsert(moment_id, txt_key)
+            if img_key is not None:
+                await self._img.upsert(moment_id, img_key)
+            if txt_key is not None:
+                await self._txt.upsert(moment_id, txt_key)
             return moment_id
         except Exception as e:
             logger.error(f"MomentDB: failed to remember — {e}")
@@ -90,8 +94,8 @@ class MomentDB:
     # ── recall ───────────────────────────────────────────────
     async def recall(self, img_key=None, txt_key=None, limit: int = 5, min_score: float = 0.0) -> list[Moment]:
         """Recall moments cued by a face and/or a phrase. Either cue alone can hit
-        (max over the available channels); ranked by relevance × recency × activation.
-        Tombstoned moments are skipped — their note is gone."""
+        (max over the available channels); ranked by relevance × recency × activation —
+        the ranking IS the forgetting: faded moments score too low to surface."""
         relevance: dict[str, float] = {}
         for key, index in ((img_key, self._img), (txt_key, self._txt)):
             if key is None:
@@ -104,7 +108,7 @@ class MomentDB:
         placeholders = ",".join("?" * len(relevance))
         rows = list(await self._db.fetchall(
             f"""SELECT id, note, activation, last_recalled_at, created_at FROM moments
-            WHERE id IN ({placeholders}) AND fidelity != 'tombstone'""",
+            WHERE id IN ({placeholders})""",
             tuple(relevance),
         ))
         now = datetime.now(timezone.utc)
@@ -128,24 +132,6 @@ class MomentDB:
             WHERE id = ?""",
             (_REINFORCE_GAIN, _now(), moment_id),
         )
-
-    # ── forget ───────────────────────────────────────────────
-    async def forget(self) -> int:
-        """Tombstone faded moments: clear the note, but KEEP the keys — so a faded
-        moment still suppresses false novelty and answers a cued recognition.
-        Returns how many were tombstoned. Idempotent."""
-        rows = list(await self._db.fetchall(
-            "SELECT id, activation, last_recalled_at FROM moments WHERE fidelity != 'tombstone'"
-        ))
-        now = datetime.now(timezone.utc)
-        faded = 0
-        for r in rows:
-            if r["activation"] * self._recency(r["last_recalled_at"], now) < _FORGET_FLOOR:
-                await self._db.execute(
-                    "UPDATE moments SET fidelity = 'tombstone', note = '' WHERE id = ?", (r["id"],)
-                )
-                faded += 1
-        return faded
 
     # ── helpers ──────────────────────────────────────────────
     @staticmethod

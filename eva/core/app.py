@@ -18,6 +18,7 @@ from .heart import Heart
 from eva.subconscious.subconscious import Subconscious
 from eva.subconscious._vision.detector import VisionDetector
 from eva.subconscious._vision.recognition import RecognitionMemory
+from eva.subconscious._speech.window import SpeechWindow
 from eva.senses.sense_buffer import SenseBuffer
 from eva.senses.audio.audio_sense import AudioSense
 from eva.senses.audio.transcriber import Transcriber
@@ -44,6 +45,7 @@ class Assembly:
     motor_system: MotorSystem
     audio_sense: AudioSense
     embedder: EmbeddingEngine
+    speech_window: SpeechWindow
     camera_sense: CameraSense | None = None
     subconscious: Subconscious | None = None
 
@@ -120,12 +122,15 @@ async def assemble(
         actions=[voice_actor, browser]
     )
  
-    # initialize transcriber and audio sense
+    # initialize transcriber and audio sense; the speech window taps every transcript
+    # (the rolling recent-speech buffer behind the future speech channel / moment txt_key)
+    speech_window = SpeechWindow()
     audio_sense = AudioSense(
         transcriber,
         speaker_identifier=speaker_identifier,
         on_interrupt=voice_actor.interrupt_from_thread,
         is_speaking=lambda: voice_actor.is_speaking,
+        on_transcript=speech_window.add,
     )
     audio_sense.start(sense_buffer)
 
@@ -173,6 +178,7 @@ async def assemble(
         motor_system=motor_system,
         audio_sense=audio_sense,
         embedder=embedder,
+        speech_window=speech_window,
         camera_sense=camera_sense,
         subconscious=subconscious,
     )

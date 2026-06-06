@@ -40,6 +40,7 @@ class CamEvent:
     route: str
     frame: np.ndarray       # the peak frame — an OWNED copy (snapshot at capture); safe to retain/mutate
     time: float
+    embedding: np.ndarray | None = None   # the peak's pooled (1, D) unit row — the moment's img_key
 
 
 @dataclass(eq=False)
@@ -174,5 +175,6 @@ class VisionDetector:
             peak.novelty,
             peak.novelty_z,
             long_nov, level, ROUTE[level],
-            peak.frame, peak.time
+            peak.frame, peak.time,
+            embedding=vector,
         )

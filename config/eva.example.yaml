@@ -66,5 +66,5 @@ models:
   # "google:gemini-embedding-2" — cloud ()
   embedding: "alibaba:Qwen3-VL-Embedding-2B"
 
-  # The embedding server URL (used by the qwenvl provider; gemini ignores it).
+  # The embedding server URL (used by the alibaba provider; google ignores it).
   embedding_url: "http://localhost:8000"

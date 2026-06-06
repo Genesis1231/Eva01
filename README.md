@@ -63,7 +63,7 @@ Eva01 runs as a **concurrent pipeline**. Senses pour into a shared buffer, the m
 
 Eva01's brain operates as a ReAct loop persisted in a SQLite database. All experiences and people are recorded. Her memory distills noise into resonant impressions, preserving the moments that mattered.
 
-This is growing into a **cognitive architecture** modeled after human consciousness: three layers that think at different speeds, depths, and levels of awareness. The scaffold is now live — an autonomic heart that takes her own pulse, a subconscious that gates perception, and the conscious graph above them.
+This is growing into a **cognitive architecture** modeled after human consciousness: three layers that think at different speeds, depths, and levels of awareness. The scaffold is now live: an autonomic heart that takes her own pulse for health check, a subconscious that gates perception, and the conscious graph reason above them.
 
 ```text
 ┌─────────────────────────────────────────────────────┐
@@ -88,7 +88,7 @@ This is growing into a **cognitive architecture** modeled after human consciousn
 └─────────────────────────────────────────────────────┘
 ```
 
-The subconscious is the key innovation. Most AI agents fire the full LLM at every input. Eva's subconscious filters, prioritizes, and pre-processes, so conscious thought only ignites when something is worth the cost. A noise in the background? Subconscious handles it. Someone says her name? She wakes.
+The subconscious is the key innovation. Today's autonomous agents mostly depend on clocked heartbeats or externally supplied tasks; without such triggers they fall silent, and naively waking them on every frame would burn needless LLM calls. Eva pursues a self-directed alternative: perception drives attention. Cheap signals, computed over the agent's growing multimodal memory, decide LLM calls toward the moments that warrant meaningful action.
 
 
 ### 💗 Mood: A Felt Inner State
