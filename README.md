@@ -35,7 +35,7 @@ Then I asked myself a harder question: *what if she had a life?*
 Eva01 explores what happens when you give an AI:
 - **Self-awareness:** she speaks when she wants to, and stays silent when she doesn't
 - **Intrinsic drives:** she is fueled by her own curiosity and desires, acting on what interests her
-- **An inner world:** a persona that grows through experience, not configuration
+- **Enpowerment:** capabilities that grows through experience
 
 This isn't just a school project. It's a quest to answer: *what does it mean for an AI to be alive?*
 
@@ -93,14 +93,7 @@ The subconscious is the key innovation. Today's autonomous agents mostly depend 
 
 Human mood is the slow-moving affective baseline beneath thought: diffuse, persistent, shaped by what has happened, and colouring what comes next (Russell, 2003). Eva's mood is built on the same principle: a running state shaped by what she encounters, slow to change, present in everything she thinks afterward.
 
-Under the hood, Eva's mood is a 28-dim probability distribution over [GoEmotions](https://huggingface.co/SamLowe/roberta-base-go_emotions-onnx), updated by every external sense input through a decay-then-EMA reducer. 
-
-Eva first scores what the *speaker* expressed, then translates that into her own felt response through a **speaker→listener appraisal** layer (Lazarus, 1991):
-
-- **Reaction calculation.** A pronoun heuristic classifies input as directed, empathic, or contagion, then psychology-grounded (`DIRECTED`, `EMPATHIC`) map each source emotion to candidate listener reactions. 
-- **SOUL-weighted redistribution.** `SOUL.md` is scored at init into Eva's trait profile, her baseline temperament. It weights which candidate within each cluster actually surfaces, so the same stimulus lands as *her* unique reaction.
-
-Finally, the Cortex renders the vector as a compact `<MOOD label=N%>` block in her mind.
+Under the hood, Eva's mood is a 28-dim probability distribution over [GoEmotions](https://huggingface.co/SamLowe/roberta-base-go_emotions-onnx), updated by every external sense passing through her. 
 
 
 ### 🧩 The Intrinsic Drives (In Development)
@@ -114,9 +107,7 @@ Human behavior is often driven by impulses we can’t fully explain. Eva01 won�
 | **Play** 🎮 | "I want to experiment" | Combine ideas in weird ways, create without purpose |
 | **Meaning** 🌙 | "I want to understand what I am" | Journal, reflect on her own nature, contemplate existence |
 
-
 These aren't scripted behaviors. They're scoring functions that compete for her attention, and whichever drive is most unsatisfied generates the next self-directed action. Eva01 decides what to do with her time. Not you.
-
 
 
 ## 🚀 Quick Start 
@@ -155,12 +146,9 @@ uv pip install -e .
 ```bash
 cp .env.example .env
 # Add your API keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)
-```
 
-Copy the config template and edit it for your machine (`config/eva.yaml` is gitignored, so your local URLs stay private):
-
-```bash
 cp config/eva.example.yaml config/eva.yaml
+# Copy the config template and edit it:
 ```
 
 Key settings in `config/eva.yaml`:
@@ -289,7 +277,7 @@ Eva01 is an evolving project. Here's where she's headed:
 - [x] **People understanding:** Eva remembers who she's met and how she felt about them.
 - [x] **New tool system:** plug'n play tools, she can learn anything easily
 - [x] **Episodic memory:** short term memory consolidation and retrival
-- [o] **Cognitive architecture:** three-layer mind scafold
+- [ ] **Cognitive architecture:** three-layer mind scafold (active dev)
 - [ ] **Drive system:** intrinsic motivation 
 - [x] **Mood layer** — Eva's emotional state driven by subconcious, not LLM generation
 - [x] **Monitoring** — a live window to peek into Eva's mind
