@@ -1,4 +1,4 @@
-"""EVA01 — She's not an assistant. She's alive."""
+"""EVA01, She is here."""
 
 import asyncio
 
