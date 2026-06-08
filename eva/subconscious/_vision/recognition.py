@@ -1,4 +1,4 @@
-"""L2 long-term recognition — a budget-capped bank of NORMAL pooled embeddings + a route threshold.
+"""L2 long-term recognition — a budget-capped bank of NORMAL pooled embeddings.
 
 representation + scorer are `features.embed` / `features.embed_novelty`. Admission is
 score-gated (MemStream, WWW'22): only frames recognised as normal contribute, so anomalies never
@@ -9,30 +9,23 @@ SLOW half of a two-timescale forgetting model (L1's recency ring is the fast hal
 "current normal", not a lifelong coverage archive. Salience weighting (protect / boost important
 moments) is the eva mainframe's job, not this module's.
 
-Route threshold = held-out null: a bank self-matches its in-sample frames, so a build/calibration
-split (not leave-one-out) is the right null — score held-out normal frames vs the build split, take
-p95. The holdout then rejoins the bank (the bank is all normal frames; the split is calibration-only)."""
+Route calibration lives in `RouteCalibrator`: the held-out split is calibration-only, and all
+normal seed frames still rejoin this bank."""
 
-from collections import deque
 from pathlib import Path
 
 import numpy as np
 
 from config import logger
+from .calibration import RouteCalibrator
 from .features import as_vector, embed_novelty
 
 
 class RecognitionMemory:
-    """L2 recognition: a budget-capped bank of NORMAL pooled embeddings + a route threshold."""
+    """L2 recognition: a budget-capped bank of NORMAL pooled embeddings."""
 
     L2_BUDGET = 8192               # max embeddings in the recognition memory
     NUM_PRIOR = 200                # prior-session NORMAL frames that seed the bank
-    NULL_PERCENTILE = 95           # route threshold = held-out p95 of normal long_nov
-    HELDOUT_FRACTION = 0.2         # fraction of seed frames reserved for calibration
-    
-    THRESHOLD_WINDOW = 512         # rolling presumed-normal scores for runtime recalibration
-    THRESHOLD_MIN_SCORES = 20      # keep tiny cold-start samples from immediately dominating
-    THRESHOLD_FLOOR = 0.1          # flood-guard 
 
     def __init__(
         self,
@@ -40,22 +33,12 @@ class RecognitionMemory:
         threshold: float,
         random_generator: np.random.Generator,
         cache_path: Path,
-        threshold_scores: np.ndarray | list[float] | None = None,
+        calibrator: RouteCalibrator | None = None,
     ):
-        self.threshold = threshold
+        self.calibrator = calibrator or RouteCalibrator(threshold)
         self.random_generator = random_generator
         self.cache_path = cache_path
-        
-        if threshold_scores is not None:
-            scores = np.ravel(threshold_scores)
-            scores = scores[np.isfinite(scores)].tolist()
-        else:
-            scores = []
-            
-        self._threshold_scores = deque(scores[-self.THRESHOLD_WINDOW:], maxlen=self.THRESHOLD_WINDOW)
-        if len(self._threshold_scores) >= self.THRESHOLD_MIN_SCORES:
-            self._refresh_threshold()
-        
+
         self._count = len(rows)
         if self._count:
             self._buffer = np.empty((self.L2_BUDGET, rows.shape[1]), dtype=np.float32)
@@ -72,6 +55,10 @@ class RecognitionMemory:
     @property
     def count(self):
         return self._count
+
+    @property
+    def threshold(self) -> float:
+        return self.calibrator.threshold
 
     @classmethod
     async def seed(cls, prior_stream: Path, cache_path: Path, engine) -> "RecognitionMemory":
@@ -91,39 +78,23 @@ class RecognitionMemory:
 
         if len(frames) < 20:
             logger.warning(f"WARN: tiny seed ({len(frames)} frames) — threshold will be noisy.")
-        
-        order = random_generator.permutation(len(frames))
 
-        # Guard against small counts: ensure at least 1 holdout, leave the rest for build
-        ideal_holdout = max(3, int(cls.HELDOUT_FRACTION * len(frames)))
-        num_holdout = min(ideal_holdout, max(0, len(frames) - 1))
-
-        holdout = [frames[i] for i in order[:num_holdout]]
-        build = [frames[i] for i in order[num_holdout:]] or frames   # calibration reference, never empty
-        build_rows = np.vstack(build)
-
-        if holdout:
-            # out-of-sample null: score held-out NORMAL frames vs the build split
-            null_scores = np.array([embed_novelty(held_out, build_rows) for held_out in holdout])
-            threshold = float(np.percentile(null_scores, cls.NULL_PERCENTILE))
-        else:
-            # Fallback if we only had 1 sample and couldn't create a held-out split
-            null_scores = None
-            threshold = float('inf')
+        calibrator = RouteCalibrator.initialize(frames, random_generator)
 
         rows = np.vstack(frames)
         if len(rows) > cls.L2_BUDGET:
             rows = rows[random_generator.choice(len(rows), cls.L2_BUDGET, replace=False)]
 
         logger.debug(f"recognition bank: {len(rows)} embeddings, "
-                     f"threshold (long_nov > {threshold:.3f} = held-out p{cls.NULL_PERCENTILE})")
+                     f"threshold (long_nov > {calibrator.threshold:.3f} = "
+                     f"held-out p{RouteCalibrator.NULL_PERCENTILE})")
 
         return cls(
             rows=rows,
-            threshold=threshold,
+            threshold=calibrator.threshold,
             random_generator=random_generator,
             cache_path=cache_path,
-            threshold_scores=null_scores,
+            calibrator=calibrator
         )
 
     @staticmethod
@@ -168,19 +139,8 @@ class RecognitionMemory:
         return embed_novelty(frame, self.rows)
 
     def observe_calibration_score(self, score: float) -> None:
-        """Recalibrate the route threshold from a presumed-normal observation. The caller MUST feed
-        this BEFORE the `<= threshold` admit gate: a sample censored at the current threshold
-        estimates p95 from below its own value, so iterating it ratchets the threshold down to the
-        minimum normal score (a censored sample has no stable fixed point)."""
-        
-        if np.isfinite(score):
-            self._threshold_scores.append(float(score))
-            self._refresh_threshold()
-
-    def _refresh_threshold(self) -> None:
-        if len(self._threshold_scores) >= self.THRESHOLD_MIN_SCORES:
-            p95 = float(np.percentile(self._threshold_scores, self.NULL_PERCENTILE))
-            self.threshold = max(self.THRESHOLD_FLOOR, p95)
+        """Observe a score for online route threshold calibration."""
+        self.calibrator.observe(score)
 
     def save(self) -> None:
         """Persist the current bank as the next session's warm-seed cache."""

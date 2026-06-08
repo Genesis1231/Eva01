@@ -61,9 +61,7 @@ Eva01 runs as a **concurrent pipeline**. Senses pour into a shared buffer, the m
 
 ### 🧠 The Three-Layer Mind  
 
-Eva01's brain operates as a ReAct loop persisted in a SQLite database. All experiences and people are recorded. Her memory distills noise into resonant impressions, preserving the moments that mattered.
-
-This is growing into a **cognitive architecture** modeled after human consciousness: three layers that think at different speeds, depths, and levels of awareness. The scaffold is now live: an autonomic heart that takes her own pulse for health check, a subconscious that gates perception, and the conscious graph reason above them.
+Eva01's brain operates in a **cognitive architecture** modeled after human consciousness: three layers that think at different speeds, depths, and levels of awareness: an autonomic heart that takes her own pulse for health check, a subconscious that gates perception, and the conscious graph reason above them.
 
 ```text
 ┌─────────────────────────────────────────────────────┐
@@ -291,7 +289,7 @@ Eva01 is an evolving project. Here's where she's headed:
 - [x] **People understanding:** Eva remembers who she's met and how she felt about them.
 - [x] **New tool system:** plug'n play tools, she can learn anything easily
 - [x] **Episodic memory:** short term memory consolidation and retrival
-- [o] **Cognitive architecture:** three-layer mind (autonomic → subconscious → conscious) — *in progress: autonomic heart + subconscious vision gate live*
+- [o] **Cognitive architecture:** three-layer mind scafold
 - [ ] **Drive system:** intrinsic motivation 
 - [x] **Mood layer** — Eva's emotional state driven by subconcious, not LLM generation
 - [x] **Monitoring** — a live window to peek into Eva's mind

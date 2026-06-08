@@ -25,9 +25,9 @@ from .recognition import RecognitionMemory
 from eva.database.embeddings import EmbeddingEngine
 
 Z_TRIGGER, NOVELTY_FLOOR = 2.0, 0.25        # pop when rolling z > Z_TRIGGER and novelty > floor
-REFRACTORY, PEAK_FALLOFF, PEAK_MAX_HOLD = 5.0, 0.6, 4.0   # REFRACTORY: cooldown measured from a burst CLOSE
+REFRACTORY, PEAK_FALLOFF, PEAK_MAX_HOLD = 5.0, 0.5, 3.0   # REFRACTORY: cooldown measured from a burst CLOSE
 TRICKLE_Z, TRICKLE_MIN_GAP = 0.75, 30.0     # grow the bank with "normal but non-trivial" frames
-ROUTE = {2: "inspect", 1: "acknowledge"}           # route, don't suppress — both are real events
+SIGNAL = {2: "inspect", 1: "acknowledge"}           # route, don't suppress — both are real events
 
 
 @dataclass(eq=False)
@@ -163,7 +163,7 @@ class VisionDetector:
             return CamEvent(
                 peak.novelty,
                 peak.novelty_z,
-                float("nan"), 1, ROUTE[1],
+                float("nan"), 1, SIGNAL[1],
                 peak.frame, peak.time)
 
         long_nov = self.l2.score(vector)
@@ -174,7 +174,7 @@ class VisionDetector:
         return CamEvent(
             peak.novelty,
             peak.novelty_z,
-            long_nov, level, ROUTE[level],
+            long_nov, level, SIGNAL[level],
             peak.frame, peak.time,
             embedding=vector,
         )
