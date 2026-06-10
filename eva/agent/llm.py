@@ -53,9 +53,6 @@ class Cortex:
         timestamp = datetime.now().strftime("%A, %B %d, %Y at %-I%p")
         system = constructor.build_system(timestamp=timestamp)
 
-        # Volatile per-turn context (memory/people/mood) rides a transient HumanMessage next to the
-        # current turn, NOT the system prompt: it changes every turn and is never checkpointed (only
-        # the model's response is), so it can't accumulate or replay stale recall.
         context = constructor.build_context(
             memory=memory,
             present_people=present_people,
@@ -63,15 +60,16 @@ class Cortex:
         )
 
         # trim to fit context window, keeping recent messages
-        messages = trim_messages(
+        conversation = trim_messages(
             messages, 
             max_tokens=self._MAX_HISTORY_TOKENS, 
             token_counter='approximate',
             start_on="human")
 
-        complete_prompt = [SystemMessage(content=system)] + messages
+        complete_prompt = [SystemMessage(content=system)]
         if context:
-            complete_prompt.append(HumanMessage(content=context))
+            complete_prompt += [HumanMessage(content=context)]
+        complete_prompt += conversation
                          
         # logger.debug(f"Cortex received messages:\n{complete_prompt}\n")
 

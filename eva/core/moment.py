@@ -36,9 +36,6 @@ class Moment:
     created_at: str
 
 
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
 
 class MomentDB:
     """Pure episodic store: memorize → recall → reinforce. Embeddings come from the caller."""
@@ -79,12 +76,10 @@ class MomentDB:
         kind: str = "moment",
         related_id: str | None = None,
     ) -> str:
-        """Store a new moment. `importance` (her felt weight) seeds activation. Any key may be
-        None — a silent moment is an image alone, a reflection is a note alone; the moment is
-        simply not cued on the channels it lacks. `kind` is 'moment' (lived) or 'reflection'
-        (a journal entry — a moment with no senses)."""
+        """Store a new moment."""
+        
         moment_id = uuid.uuid4().hex[:12]
-        now = _now()
+        now = datetime.now(timezone.utc).isoformat()
         try:
             await self._db.execute(
                 """INSERT INTO moments
@@ -110,8 +105,11 @@ class MomentDB:
     ) -> list[Moment]:
         """Recall by any combination of cues, **max-fused** over the channels present: recall is OR
         — one strong cue should relight the whole moment, so averaging (which dilutes a single hit)
-        is wrong. MVP ranks by relevance alone (forgetting curve is a later slice). Reflections have
+        is wrong. 
+        
+        MVP ranks by relevance alone (forgetting curve is a later slice). Reflections have
         no perceptual keys, so only the note cue surfaces them."""
+        
         relevance: dict[str, float] = {}
         for key, index in (
             (img_key, self._img), (txt_key, self._txt),
@@ -137,7 +135,6 @@ class MomentDB:
         moments.sort(key=lambda m: m.score, reverse=True)
         return moments[:limit]
 
-    # ── reinforce ────────────────────────────────────────────
     async def reinforce(self, moment_id: str) -> None:
         """A recall strengthens the trace (diminishing toward 1.0) and resets its clock.
         Defined for the forgetting slice — not yet called on recall (MVP ranks by relevance)."""
@@ -145,10 +142,10 @@ class MomentDB:
             """UPDATE moments
             SET activation = MIN(1.0, activation + (1.0 - activation) * ?), last_recalled_at = ?
             WHERE id = ?""",
-            (_REINFORCE_GAIN, _now(), moment_id),
+            (_REINFORCE_GAIN, datetime.now(timezone.utc).isoformat(), moment_id),
         )
 
-    # ── recent (her diary, for the system prompt) ────────────
+
     async def recent(self, limit: int = 5) -> list[str]:
         """Today's reflections, newest-N, returned oldest-first and timestamp-formatted — the
         journal context injected into her prompt each session. Read-only: never reinforces (this

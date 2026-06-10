@@ -45,9 +45,7 @@ class VectorIndex:
         self._ready = True
 
     async def _exists(self) -> bool:
-        """Check if the vec0 table exists; if so, recover its dimension from the stored DDL
-        (authored by _ensure, so the float[N] form is stable) — _ready must never be set
-        without _dim, or a search-before-write after a restart breaks every later upsert."""
+        """Check if the vec0 table exists; if so, recover its dimension from the stored DDL."""
         if self._ready:
             return True
         row = await self._db.fetchone(
