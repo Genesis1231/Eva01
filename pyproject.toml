@@ -6,23 +6,17 @@ requires-python = ">=3.10"
 readme = "README.md"
 license = { file = "LICENSE" }
 
-# Runtime dependencies are tracked in requirements.txt.
-# Install in dev mode with: uv pip install -e .
+# Runtime dependencies are tracked in requirements.in / requirements.txt.
+# Install all deps with: uv pip install -r requirements.txt
+# Editable install (optional, for IDE navigation): uv pip install -e .
 dependencies = [
     "html2image>=2.0.7",
 ]
 
 [project.optional-dependencies]
-embed-openai = [
-    "openai>=1.0",
-]
-embed-local = [
-    "fastembed>=0.3.0",
-]
-embed-all = [
-    "openai>=1.0",
-    "fastembed>=0.3.0",
-    "sqlite-vec>=0.1.6",
+# Cloud Gemini embedding provider (optional — default provider is the local Qwen server).
+embed-gemini = [
+    "google-genai>=1.0",
 ]
 voice-local = [
     "kokoro-onnx>=0.3.9",

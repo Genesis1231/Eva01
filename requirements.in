@@ -33,7 +33,6 @@ firecrawl-py==4.18.1
 tavily-python==0.7.23
 
 # Memory and embeddings
-fastembed==0.8.0
 sqlite-vec==0.1.6
 
 # Audio
@@ -47,7 +46,11 @@ python-mpv==1.0.8
 sounddevice==0.5.5
 soundfile==0.13.1
 
+# HTTP client (used directly in embeddings.py and utils/feed.py)
+httpx==0.28.1
+
 # Utilities and tooling
+html2image>=2.0.7
 pytest==9.0.2
 tabulate==0.9.0
 yt-dlp==2026.3.3

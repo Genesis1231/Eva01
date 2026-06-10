@@ -132,12 +132,9 @@ sudo apt-get install -y ffmpeg
 # Create venv and install dependencies
 uv venv
 source .venv/bin/activate
+uv pip install -r requirements.txt
 
-# Choose your stack:
-# 1. Base (Online/API only - Slim)
-uv pip install -e .
-
-# 2. Local AI (Voice/Vision - Heavy)
+# Optional — local Voice/Vision models (heavy, needs CUDA GPU):
 # uv pip install -e .[voice-local,vision-local]
 ```
 
@@ -281,7 +278,7 @@ Eva01 is an evolving project. Here's where she's headed:
 - [ ] **Drive system:** intrinsic motivation 
 - [x] **Mood layer** — Eva's emotional state driven by subconcious, not LLM generation
 - [x] **Monitoring** — a live window to peek into Eva's mind
-- [ ] **Semantic memory:** knowledge consolidation and retrieval
+- [ ] **Belief System** knowledge base, create, renewal and retrieval
 - [ ] **Self-modification:** eva adjusts her own config based on self-reflection
 
 
