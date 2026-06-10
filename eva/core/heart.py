@@ -3,6 +3,7 @@ EVA's heartbeat — her autonomic layer for maintenance and self-monitoring.
 """
 
 import asyncio
+from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -17,7 +18,8 @@ SHOTS_DIR = Path(__file__).resolve().parents[2] / "frontend" / "public" / "tmp"
 SHOTS_KEEP = 200          # most-recent look-*.png screenshots to retain
 
  # LangGraph checkpointer store (under DATA_DIR/database/)
-GRAPH_DB = "eva_graph.db" 
+GRAPH_DB = "eva_graph.db"
+CKPT_RETAIN_DAYS = 30     # sessions older than this lose their checkpoints
 
 
 class Heart:
@@ -69,6 +71,7 @@ class Heart:
             logger.info(f"Heart: vitals — {line}")
 
         await self._log_checkpoints()
+        await self._prune_checkpoints()
         await self._sweep_shots()
 
     async def _sweep_shots(self) -> None:
@@ -126,6 +129,26 @@ class Heart:
             f"Heart: {session['ckpts']} checkpoints in current session · "
             f"total {total['ckpts']} / {total['sessions']}"
         )
+
+    async def _prune_checkpoints(self) -> None:
+        """Prune LangGraph checkpoints from sessions older than CKPT_RETAIN_DAYS.
+
+        Recent sessions are kept as the record for analysis. thread_ids are
+        time-stamped (eva-YYYYMMDDHHMMSSffffff) so age is one lexicographic
+        compare; the newest thread is always spared — a long-lived session is
+        live state, not a stale record. Failures never disturb the beat.
+        """
+        cutoff = (datetime.now() - timedelta(days=CKPT_RETAIN_DAYS)).strftime("%Y%m%d%H%M%S%f")
+        try:
+            for table in ("checkpoints", "writes"):
+                await self.db.execute(
+                    f"DELETE FROM {table} WHERE thread_id < ? AND thread_id != "
+                    "(SELECT max(thread_id) FROM checkpoints)",
+                    (f"eva-{cutoff}",),
+                    db_name=GRAPH_DB,
+                )
+        except Exception as e:
+            logger.debug(f"Heart: checkpoint prune skipped — {e}")
 
     @staticmethod
     def _mark(result) -> str:
