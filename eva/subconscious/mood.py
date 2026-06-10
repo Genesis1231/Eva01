@@ -1,12 +1,9 @@
-"""EVA's running mood — go_emotions probabilities, decayed + EMA-updated.
+"""EVA's running mood: go_emotions probabilities, decayed and EMA-updated.
 
-The mood vector is a 28-dim probability distribution over the
-go_emotions label set (SamLowe/roberta-base-go_emotions-onnx). External
-sense inputs update it through a decay-then-EMA reducer attached to the
-LangGraph state. Inner-voice ("thought") events do not update mood —
-outside factors change mood, inner narration doesn't (matches
-human-psychology priors).
-
+The mood vector is a 28-dim distribution over the go_emotions labels
+(SamLowe/roberta-base-go_emotions-onnx). External senses update it through a decay-then-EMA
+reducer on the LangGraph state. Inner-voice ("thought") events leave mood alone: outside
+factors move mood, inner narration doesn't (a human-psychology prior).
 """
 
 import numpy as np
@@ -52,7 +49,7 @@ def _update_mood(
 
 
 class MoodScorer:
-    """go_emotions mood score + SOUL-conditioned appraisal.  """
+    """go_emotions mood scoring with SOUL-conditioned appraisal."""
 
     def __init__(self) -> None:
         self.initialize_mood()
@@ -60,7 +57,7 @@ class MoodScorer:
         logger.debug("MoodScorer: emotion model ready.")
 
     def initialize_mood(self) -> None:
-        """Load ONNX model + tokenizer, then score SOUL.md as the trait profile."""
+        """Load the ONNX model and tokenizer, then score SOUL.md as the trait profile."""
 
         if not (_ONNX_PATH.exists() and _TOKENIZER_PATH.exists()):
             raise FileNotFoundError(
@@ -80,11 +77,11 @@ class MoodScorer:
             raise RuntimeError(f"MoodScorer initialization failed. {e}") 
     
     def initialize_soul(self) -> list[float]:
-        """ Score SOUL.md to get the initial trait profile"""
+        """Score SOUL.md to get the initial trait profile."""
         return self._raw(load_prompt("SOUL"))
 
     def _raw(self, text: str) -> list[float]:
-        """28 raw probabilities aligned to :data:`GO_EMOTIONS_LABELS`."""
+        """28 raw probabilities, aligned to GO_EMOTIONS_LABELS."""
 
         enc = self._tokenizer.encode(text)
         input_ids = np.asarray([enc.ids], dtype=np.int64)
@@ -97,7 +94,7 @@ class MoodScorer:
         return self._sigmoid(logits).tolist()
 
     def score(self, text: str, source: str | None = None) -> list[float]:
-        """Score ``text`` with optional speaker→listener appraisal. """
+        """Score text, with optional speaker-to-listener appraisal."""
 
         text = strip_sense_tag(text)
         raw = self._raw(text)
@@ -123,10 +120,10 @@ def surfaced_emotions(
     mood: list[float] | None,
     top_k: int = RENDER_TOP_K,
 ) -> list[tuple[str, float]]:
-    """
-    The mood's top-k non-neutral emotions that clear :data:`RENDER_THRESHOLD`,
-    strongest first. Shared by :func:`render_mood` (the brain's prompt block) and
-    the Room feed's ``mood_labels`` — one place for the filter/sort/threshold.
+    """The top-k non-neutral emotions that clear RENDER_THRESHOLD, strongest first.
+
+    Shared by render_mood (the brain's prompt block) and the Room feed's mood_labels, so
+    the filter/sort/threshold live in one place.
     """
     if not mood:
         return []
@@ -140,7 +137,7 @@ def surfaced_emotions(
 
 
 def render_mood(mood: list[float] | None) -> str:
-    """Render mood as a compact ``<MOOD>label=N% ...</MOOD>`` block. """
+    """Render mood as a compact "<MOOD label=N% ...>" block."""
     
     surfaced = surfaced_emotions(mood)
     if not surfaced:

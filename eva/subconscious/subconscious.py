@@ -1,6 +1,6 @@
-"""EVA's subconscious — the always-on perceptual gate beneath the conscious graph.
+"""EVA's subconscious: the always-on perceptual gate beneath the conscious graph.
 
-Raw frames never enter the SenseBuffer — they stay inside the gate — so they don't reset the Heart's
+Raw frames never enter the SenseBuffer, they stay inside the gate, so they don't reset the Heart's
 idle clock. Only a salient scene reaches the brain.
 """
 
@@ -18,9 +18,11 @@ from eva.subconscious._vision.detector import CamEvent, VisionDetector
 
 
 class Subconscious:
-    """The subconscious layer, surfacing novel moments up."""
+    """The always-on perceptual gate: an async ~1 fps loop (a peer of breathe in wake(), not a
+    graph node). Each glance routes: inspect wakes the brain, acknowledge habituates quietly."""
 
     GATE_INTERVAL = 1.0     # seconds per glance (~1 fps)
+    MAX_BACKOFF = 60.0      # glance interval cap while the camera/engine is down
     def __init__(
         self,
         sense_buffer: SenseBuffer,
@@ -39,50 +41,61 @@ class Subconscious:
         logger.debug("Subconscious: initialized.")
 
     async def start(self) -> None:
-        """Beat forever — glance, gate, surface. A peer in wake()'s asyncio.gather."""
+        """Beat forever: glance, gate, surface. A peer in wake()'s asyncio.gather."""
         
         if not self.vision.is_available:
-            logger.warning("Subconscious: no camera — vision gate disabled.")
+            logger.warning("Subconscious: no camera, vision gate disabled.")
             return
 
         logger.debug(f"Subconscious started. vision gate at ~{1 / self.interval:.1f} fps")
+        failures = 0
         while not self._stop.is_set():
             started = time.monotonic()
             try:
-                await self._glance()
-            except Exception as e:
-                logger.error(f"Subconscious: gate error — {e}")
-                
-            await self._pace(self.interval - (time.monotonic() - started))
-            # print(".", end="")  # heartbeat for the gate loop
+                healthy = await self._glance()
+                failures = 0 if healthy else failures + 1
+            except Exception:
+                failures += 1
+                logger.error("Subconscious: gate error", exc_info=True)
+
+            # A dead camera or embedding engine fails every glance; back off
+            # exponentially instead of spinning a hot error loop, recover on success.
+            delay = min(self.interval * 2 ** failures, self.MAX_BACKOFF)
+            await self._pace(delay - (time.monotonic() - started))
 
     async def _pace(self, remaining: float) -> None:
-        """Sleep the rest of the interval, but wake immediately on stop — holds ~1 fps."""
+        """Sleep the rest of the interval, but wake immediately on stop, holding ~1 fps."""
         try:
             await asyncio.wait_for(self._stop.wait(), timeout=max(0.0, remaining))
         except asyncio.TimeoutError:
             pass
         
-    async def _glance(self) -> None:
-        """Inspect wakes the brain; acknowledge habituates."""
-        
+    async def _glance(self) -> bool:
+        """Inspect wakes the brain; acknowledge habituates. Returns False when
+        perception failed (engine down) so the gate loop can back off."""
+
         frame = await asyncio.to_thread(self.vision.capture_photo)
         view = await self.vision_detector.observe(frame, time.monotonic())
-        
-        if view is None or view.event is None:
-            return
+
+        if view is None:
+            return False
+        if view.event is None:
+            return True
 
         if view.event.level == 2:
-            # inspect — genuinely new → wake the brain
+            # inspect: genuinely new, wake the brain
             await self._surface(view.event)
         else:
-            # acknowledge — familiar → habituate quietly
-            logger.debug(f"Subconscious: familiar habituation — novelty_z={view.event.novelty_z:.2f}, long_nov={view.event.long_nov:.3f}")
+            # acknowledge: familiar, habituate quietly
+            logger.debug(f"Subconscious: familiar habituation: novelty_z={view.event.novelty_z:.2f}, long_nov={view.event.long_nov:.3f}")
+        return True
 
 
 
     async def _surface(self, event: CamEvent) -> None:
-        """Describe the novel scene and wake the brain."""
+        """Wake the brain on a novel scene: save the frame, then push the raw frame itself (as a
+        data-URI) to the SenseBuffer so the cortex sees the image directly (cognitive mode), with no
+        Describer caption in the gate path."""
         
         self._save_inspect(event) # keep the novel frame
         
@@ -110,7 +123,7 @@ class Subconscious:
             name = f"{time.strftime('%Y%m%d_%H%M%S')}_z{event.novelty_z:.0f}.jpg"
             cv2.imwrite(str(self.inspect_dir / name), event.frame)
         except Exception as e:
-            logger.warning(f"Subconscious: failed to save inspect frame — {e}")
+            logger.warning(f"Subconscious: failed to save inspect frame: {e}")
 
     async def stop(self) -> None:
         """Stop the gate, persist the drifting-normal bank for next boot, release the camera."""
@@ -118,7 +131,7 @@ class Subconscious:
         try:
             self.vision_detector.save()
         except Exception as e:
-            logger.warning(f"Subconscious: failed to persist recognition bank — {e}")
+            logger.warning(f"Subconscious: failed to persist recognition bank: {e}")
             
         self.vision.release()
         logger.debug("Subconscious: stopped.")

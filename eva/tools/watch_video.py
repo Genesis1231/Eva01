@@ -124,7 +124,7 @@ async def watch_video(url: str) -> str:
             summary = await _summarize_transcript(title, description, transcript)
             return f"I read the transcript of '{title}':\n\n{summary}"
 
-        return f"This video is too long to watch. Description: {description[500:] if description else 'No description'}..."
+        return f"This video is too long to watch. Description: {description[:500] if description else 'No description'}..."
 
     # Non-YouTube: just analyze directly
     return await _analyze_video(url)

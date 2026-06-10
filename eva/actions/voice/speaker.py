@@ -82,8 +82,7 @@ class Speaker:
         """ Speak the given text. Blocking — run via to_thread. """
 
         if self.model is None or not hasattr(self.model, 'eva_speak'):
-            logger.error("Speaker: TTS model not initialized or does not support speaking.")
-            raise
+            raise RuntimeError("Speaker: TTS model not initialized or does not support speaking.")
         
         try:
             print(f"\n({datetime.now().strftime('%H:%M:%S')}) EVA: {answer}")

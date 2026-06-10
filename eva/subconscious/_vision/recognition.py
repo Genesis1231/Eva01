@@ -1,16 +1,16 @@
-"""L2 long-term recognition — a budget-capped bank of NORMAL pooled embeddings.
+"""L2 long-term recognition: a budget-capped bank of NORMAL pooled embeddings.
 
-representation + scorer are `features.embed` / `features.embed_novelty`. Admission is
-score-gated (MemStream, WWW'22): only frames recognised as normal contribute, so anomalies never
-poison "normal". When full, a new embedding overwrites a uniformly-random slot — random-replacement
-forgetting: an exponential, recency-biased decay (not FIFO's hard cliff), and since recurring normals
-are re-admitted they consolidate (more copies = longer survival) while one-offs fade. So L2 is the
-SLOW half of a two-timescale forgetting model (L1's recency ring is the fast half): a drifting
-"current normal", not a lifelong coverage archive. Salience weighting (protect / boost important
-moments) is the eva mainframe's job, not this module's.
+The representation and scorer are features.embed / features.embed_novelty. Admission is score-gated
+(MemStream, WWW'22): only frames recognised as normal contribute, so anomalies never poison
+"normal". When the bank is full a new embedding overwrites a uniformly-random slot. That random
+replacement is the forgetting: an exponential, recency-biased decay rather than FIFO's hard cliff,
+and since recurring normals get re-admitted they consolidate (more copies means longer survival)
+while one-offs fade. So L2 is the slow half of a two-timescale forgetting model (L1's recency ring is
+the fast half): a drifting "current normal", not a lifelong coverage archive. Salience weighting
+(protecting or boosting important moments) is the eva mainframe's job, not this module's.
 
-Route calibration lives in `RouteCalibrator`: the held-out split is calibration-only, and all
-normal seed frames still rejoin this bank."""
+Route calibration lives in RouteCalibrator: the held-out split is calibration-only, and all normal
+seed frames still rejoin this bank."""
 
 from pathlib import Path
 
@@ -22,7 +22,8 @@ from .features import as_vector, embed_novelty
 
 
 class RecognitionMemory:
-    """L2 recognition: a budget-capped bank of NORMAL pooled embeddings."""
+    """The L2 bank (budget-capped NORMAL embeddings): score(frame) gives novelty vs normal,
+    admit(v) grows it (score-gated, random replacement), and seed()/save() persist it."""
 
     L2_BUDGET = 8192               # max embeddings in the recognition memory
     NUM_PRIOR = 200                # prior-session NORMAL frames that seed the bank
@@ -77,7 +78,7 @@ class RecognitionMemory:
             )
 
         if len(frames) < 20:
-            logger.warning(f"WARN: tiny seed ({len(frames)} frames) — threshold will be noisy.")
+            logger.warning(f"WARN: tiny seed ({len(frames)} frames), threshold will be noisy.")
 
         calibrator = RouteCalibrator.initialize(frames, random_generator)
 
@@ -105,8 +106,8 @@ class RecognitionMemory:
         if cache_path.exists():
             cached = np.load(cache_path).astype(np.float32)
             logger.debug(f"seed: cache hit ({len(cached)} prior-session frames)")
-            # Tolerate both on-disk layouts — legacy (N, 1, D) from np.stack and the (N, D) that
-            # save() writes — and yield (1, D) rows (what seed/embed_novelty expect). Re-normalise
+            # Tolerate both on-disk layouts (legacy (N, 1, D) from np.stack, and the (N, D) that
+            # save() writes) and yield (1, D) rows, which is what seed/embed_novelty expect. Re-normalise
             # per row: a float16 cache is rounded/denormalised, so a warm seed would otherwise drift.
             rows = cached.reshape(cached.shape[0], -1)
             # Normalize the whole matrix at once along axis 1
@@ -133,7 +134,7 @@ class RecognitionMemory:
         return embeddings
 
     def score(self, frame: np.ndarray) -> float:
-        """Novelty of this frame's pooled embedding vs the bank. Higher = more novel. """
+        """Novelty of this frame's pooled embedding vs the bank. Higher is more novel."""
         if self._count == 0:
             return 0.0
         return embed_novelty(frame, self.rows)
@@ -149,7 +150,7 @@ class RecognitionMemory:
             np.save(self.cache_path, self.rows.astype(np.float32))
 
     def admit(self, query: np.ndarray) -> None:
-        """Admit query embedding(s) in-place. random choice replacement if necessary."""
+        """Admit query embedding(s) in place, with random-choice replacement when the bank is full."""
 
         n_new = len(query)
         if self._buffer is None:

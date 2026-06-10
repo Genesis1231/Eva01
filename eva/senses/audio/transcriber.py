@@ -77,11 +77,12 @@ class Transcriber:
             return None
 
         text, language = transcription
+        if not text or not text.strip():
+            # Silence / VAD-filtered clips come back empty — treat as no speech,
+            # or a phantom "I heard:" event wakes the brain.
+            return None
 
-        # Format content for the system
-        content = f"{text.strip()}"
-
-        return (content, language)
+        return (text.strip(), language)
 
     def close(self) -> None:
         """Release the underlying model resources."""

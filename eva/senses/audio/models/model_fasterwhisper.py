@@ -59,18 +59,19 @@ class FWTranscriber:
         logger.debug(f"Initialized FW model '{self.model_name}' on {self.device}.")
 
     def transcribe_audio(
-        self, 
+        self,
         audio_clip: Union[np.ndarray, List[float]]
-    ) -> Tuple[Optional[str], Optional[str]]:
-        """Transcribe the given audio clip."""
-        
+    ) -> Optional[Tuple[str, str]]:
+        """Transcribe the given audio clip. Returns None on failure — never a
+        (None, None) tuple, which is truthy and slips past the caller's guard."""
+
         if self.model is None:
             logger.error("Faster Whisper model is not initialized.")
-            return (None, None)
+            return None
 
         if not isinstance(audio_clip, (np.ndarray, list)):
             logger.error(f"Invalid audio format: {type(audio_clip)}")
-            return (None, None)
+            return None
 
         if isinstance(audio_clip, list):
             audio_clip = np.array(audio_clip, dtype=np.float32)
@@ -89,7 +90,7 @@ class FWTranscriber:
 
         except Exception as e:
             logger.error(f"Failed to transcribe audio: {e}")
-            return (None, None)
+            return None
 
     def close(self) -> None:
         """Explicitly release resources."""

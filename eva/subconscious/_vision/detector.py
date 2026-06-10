@@ -1,21 +1,24 @@
-"""
-The visual-novelty detector — ONE patch scorer over TWO memories (NGU style), as a single class.
+"""The visual-novelty detector: one patch scorer over two memories (NGU style), in a single class.
 
-    L1 = recency FIFO (fifo.SensoryMemory): patch novelty vs the last frames -> z + floor -> candidate
-        pop. Recency eviction is habituation — it decides WHEN something is worth a second look.
+    L1 = recency FIFO (fifo.SensoryMemory): patch novelty vs the last frames, then z plus a floor,
+        gives a candidate pop. Recency eviction is habituation; it decides WHEN something is worth a
+        second look.
     L2 = long-term recognition (recognition.RecognitionMemory): on a pop, embed the peak frame and
-        measure its distance to the "normal world" -> is this content genuinely NEW?
+        measure its distance to the "normal world" to ask whether the content is genuinely new.
 
-Detect (L1, every frame) -> Value (L2 graded long_nov on a pop) -> Route (recognised -> "acknowledge"
-+ grow the bank; new -> "inspect"). Every committed burst is emitted; deduping redundant re-fires of
-a lingering event is the consumer's (eva mainframe's) job — it has the context to weigh salience.
+Detect (L1, every frame), value (L2 grades long_nov on a pop), route (recognised goes to
+"acknowledge" and grows the bank; new goes to "inspect"). Every committed burst is emitted; deduping
+redundant re-fires of a lingering event is the consumer's job (the eva mainframe has the context to
+weigh salience).
 
-`observe(frame, now)` is the cognitive step (async — it awaits the engine's patch/embed calls). A
-subconscious processor or the CLI runner drives it in a camera loop. Each frame yields a CamView; a
-finished burst yields a CamEvent. Learned representations come from the shared EmbeddingEngine, with
-a CV2 patch-grid fallback for providers that only expose pooled image embeddings."""
+observe(frame, now) is the cognitive step (async, it awaits the engine's patch/embed calls). A
+subconscious processor or the CLI runner drives it in a camera loop. Each frame yields a CamView, and
+a finished burst yields a CamEvent. Learned representations come from the shared EmbeddingEngine,
+with a CV2 patch-grid fallback for providers that only expose pooled image embeddings."""
 
+import asyncio
 from dataclasses import dataclass
+
 import numpy as np
 
 from config import logger
@@ -27,25 +30,25 @@ from eva.database.embeddings import EmbeddingEngine
 Z_TRIGGER, NOVELTY_FLOOR = 2.0, 0.25        # pop when rolling z > Z_TRIGGER and novelty > floor
 REFRACTORY, PEAK_FALLOFF, PEAK_MAX_HOLD = 5.0, 0.5, 3.0   # REFRACTORY: cooldown measured from a burst CLOSE
 TRICKLE_Z, TRICKLE_MIN_GAP = 0.75, 30.0     # grow the bank with "normal but non-trivial" frames
-SIGNAL = {2: "inspect", 1: "acknowledge"}           # route, don't suppress — both are real events
+SIGNAL = {2: "inspect", 1: "acknowledge"}           # route, don't suppress; both are real events
 
 
 @dataclass(eq=False)
 class CamEvent:
-    """A committed novelty event: a burst's peak frame, valued (long_nov) + routed (level) by L2."""
+    """A committed novelty event: a burst's peak frame, valued (long_nov) and routed (level) by L2."""
     novelty: float          # L1 perceptual novelty at the peak
     novelty_z: float
     long_nov: float         # L2 distance to the normal world (nan if the embed call failed)
     level: int              # 2 = inspect (new), 1 = acknowledge (recognised)
     route: str
-    frame: np.ndarray       # the peak frame — an OWNED copy (snapshot at capture); safe to retain/mutate
+    frame: np.ndarray       # the peak frame, an OWNED copy (snapshot at capture), safe to retain/mutate
     time: float
-    embedding: np.ndarray | None = None   # the peak's pooled (1, D) unit row — the moment's img_key
+    embedding: np.ndarray | None = None   # the peak's pooled (1, D) unit row, the moment's img_key
 
 
 @dataclass(eq=False)
 class CamView:
-    """What observe() returns each frame: the per-frame L1 reading + a CamEvent when a burst commits."""
+    """What observe() returns each frame: the per-frame L1 reading, plus a CamEvent when a burst commits."""
     novelty: float
     novelty_z: float
     triggered: bool
@@ -62,7 +65,8 @@ class _Peak:
 
 
 class VisionDetector:
-    """The visual-novelty detector — ONE patch scorer over TWO memories (NGU style)"""
+    """L1 (recency habituation), L2 (recognition), and peak-capture behind one async
+    observe(frame, now): a CamView per frame, and a CamEvent when a burst commits."""
 
     def __init__(self, l2: RecognitionMemory, engine: EmbeddingEngine):
         self.l1 = SensoryMemory()
@@ -73,7 +77,7 @@ class VisionDetector:
         self._last_trickle = 0.0
 
     async def observe(self, frame: np.ndarray, now: float) -> CamView | None:
-        """Process one frame -> a per-frame CamView (with a CamEvent when a burst commits). Returns
+        """Process one frame into a per-frame CamView (with a CamEvent when a burst commits). Returns
         None only when patch encoding fails, so the caller can time a server-down abort."""
 
         if self.engine.supports_patches:
@@ -84,7 +88,9 @@ class VisionDetector:
         else:
             patches = cv_patch_grid(frame)
 
-        scores = self.l1.observe(patches)
+        # The L1 matmul scans up to BANK_FRAMES x patches_per_frame reference rows every
+        # frame — real CPU work that would stall the brain/audio loops if run on the loop.
+        scores = await asyncio.to_thread(self.l1.observe, patches)
         if scores is None:
             return CamView(0.0, 0.0, False)
 
@@ -100,7 +106,7 @@ class VisionDetector:
         return CamView(novelty, novelty_z, triggered, event)
 
     async def flush(self, now: float | None = None) -> CamEvent | None:
-        """Commit a peak still in progress. The refractory clock is `now` (the burst close), or the
+        """Commit a peak still in progress. The refractory clock is now (the burst close), or the
         peak time when called at shutdown without one."""
         
         if self._peak is None:
@@ -131,7 +137,7 @@ class VisionDetector:
                 self.l2.admit(vector)
         self._last_trickle = now
 
-    # peak-capture: commit the STRONGEST frame of a trigger-burst, not the onset 
+    # peak-capture: commit the STRONGEST frame of a trigger-burst, not the onset
     async def _track_peak(self, novelty, novelty_z, frame, triggered, now) -> CamEvent | None:
         """Track a trigger burst: start a peak on trigger, raise it as novelty grows, commit on fade."""
         
@@ -155,7 +161,7 @@ class VisionDetector:
         return novelty < PEAK_FALLOFF * self._peak.novelty or now - self._peak.time > PEAK_MAX_HOLD
 
     async def _commit(self, peak: _Peak) -> CamEvent:
-        """Value + Route a finished peak: embed it, score vs the bank, route, grow the bank if normal."""
+        """Value and route a finished peak: embed it, score vs the bank, route, and grow the bank if normal."""
 
         vector = as_vector(await self.engine.embed_image(to_jpeg(peak.frame)))
         if vector is None:

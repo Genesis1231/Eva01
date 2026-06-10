@@ -77,11 +77,33 @@ class SQLiteHandler:
         params_list: list[tuple[Any, ...]],
         db_name: str = SQLITE_DB_NAME,
     ) -> None:
-        """Execute a query with multiple sets of parameters."""
+        """Execute a query with multiple sets of parameters, atomically."""
         conn = await self._get_connection(db_name)
         async with self._write_locks[db_name]:
-            await conn.executemany(query, params_list)
-            await conn.commit()
+            try:
+                await conn.executemany(query, params_list)
+                await conn.commit()
+            except BaseException:
+                # Roll back rows already applied — otherwise they linger uncommitted
+                # on the shared connection and the next unrelated commit persists them.
+                await conn.rollback()
+                raise
+
+    async def execute_transaction(
+        self,
+        statements: list[tuple[str, tuple[Any, ...]]],
+        db_name: str = SQLITE_DB_NAME,
+    ) -> None:
+        """Execute several write statements as one atomic transaction (all-or-nothing)."""
+        conn = await self._get_connection(db_name)
+        async with self._write_locks[db_name]:
+            try:
+                for query, params in statements:
+                    await conn.execute(query, params)
+                await conn.commit()
+            except BaseException:
+                await conn.rollback()
+                raise
 
     async def execute_insert(
         self,

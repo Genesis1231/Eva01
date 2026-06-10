@@ -12,7 +12,7 @@ from config import logger, eva_configuration, DATA_DIR, Config
 from .graph import Brain
 from .memory import MemoryDB
 from .people import PeopleDB
-from .journal import JournalDB
+from .moment import MomentDB
 from .tasks import TaskDB
 from .heart import Heart
 from eva.subconscious.subconscious import Subconscious
@@ -67,16 +67,16 @@ async def assemble(
     # Semantic embedding engine (safe-degrading if provider/deps are unavailable)
     embedder = EmbeddingEngine(config.EMBEDDING_MODEL, base_url=config.EMBEDDING_URL)
 
-    # People, Memory & Tasks
+    # People, Memory & Tasks — moments are the unified episodic + reflection store
     people_db = PeopleDB(db)
-    journal_db = JournalDB(db)
+    moment_db = MomentDB(db)
     task_db = TaskDB(db)
     await asyncio.gather(
         people_db.init_db(),
-        journal_db.init_db(),
+        moment_db.init_db(),
         task_db.init_db(),
     )
-    memory_db = MemoryDB(config.UTILITY_MODEL, people_db, journal_db)
+    memory_db = MemoryDB(config.UTILITY_MODEL, people_db, moment_db, embedder)
 
     # Init task tool before Brain (Brain calls load_tools in __init__)
     from eva.tools import tasks as task_tools

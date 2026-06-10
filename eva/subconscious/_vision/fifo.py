@@ -1,9 +1,9 @@
-"""L1 habituation / episodic memory: a rolling ring of the last BANK_FRAMES frames.
+"""L1 habituation: a rolling ring of the last BANK_FRAMES frames.
 
-Every frame is scored vs that memory (perceptual_novelty), then rolling-z-scored over a recent window.
-Recency eviction IS the point (habituation) — NOT coverage, which is exactly why L1 is NOT a coreset
-(coverage over a lifetime lives in recognition, the OPPOSITE memory). Independent of L2: it only
-depends on the shared scorer in features."""
+Every frame is scored against that memory (perceptual_novelty), then rolling-z-scored over a recent
+window. Recency eviction is the point (habituation), not coverage, which is exactly why L1 is not a
+coreset; lifetime coverage lives in recognition, the opposite memory. L1 is independent of L2: it
+only depends on the shared scorer in features."""
 
 from collections import deque
 import numpy as np
@@ -11,8 +11,8 @@ from .features import patch_novelty
 
 
 class SensoryMemory:
-    """L1 habituation, recency FIFO: scores each frame's perceptual novelty against a rolling memory of the last
-    `bank_frames` frames, then rolling-z-scores it. Recency eviction IS the point (habituation)."""
+    """L1 habituation, a recency FIFO: scores each frame's perceptual novelty against a rolling
+    memory of the last BANK_FRAMES frames, then rolling-z-scores it. Recency eviction is the point."""
 
     BANK_FRAMES = 120          # number of frames to keep in the recency memory.
     WARMUP_FRAMES = 30         # number of frames to fill the memory before scoring (novelty=0.0, scored=False until then)
@@ -24,7 +24,7 @@ class SensoryMemory:
         self.history = deque(maxlen=self.Z_WINDOW)
 
     def observe(self, patches: np.ndarray) -> tuple[float, float, bool] | None:
-        """Score `patches` vs the recency memory, then admit them (FIFO eviction). Returns
+        """Score patches against the recency memory, then admit them (FIFO eviction). Returns
         (perceptual_novelty, novelty_z, scored); novelty/z stay 0.0 and scored=False until the memory
         and the z-window have filled past WARMUP. Returns None if the grid size differs."""
 

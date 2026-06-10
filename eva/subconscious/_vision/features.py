@@ -1,14 +1,14 @@
-"""Visual novelty scoring — the pure-numpy scorers + small frame/vector helpers.
+"""Visual novelty scoring: the pure-numpy scorers plus small frame/vector helpers.
 
 Learned patch tokens and pooled embeddings come from the shared EmbeddingEngine
-(eva/database/embeddings.py). This module turns frames into bytes, provides a CV2 fallback patch grid,
-shapes pooled embeddings, and scores a representation vs a reference set — one scorer per timescale,
-both using the same k=KNN smoothing:
+(eva/database/embeddings.py). This module turns frames into bytes, provides a CV2 fallback patch
+grid, shapes pooled embeddings, and scores a representation against a reference set. There's one
+scorer per timescale, both using the same k=KNN smoothing:
 
-    L1 (patch): `patch_novelty` scores a frame's patch tokens vs a reference patch set — mean of the
-                TOP_K most-novel patches, each patch via per-patch k-NN.
-    L2 (embed): `embed_novelty` scores a frame's pooled vector vs a reference set — 1 - mean of the
-                KNN nearest cosines.
+    L1 (patch): patch_novelty scores a frame's patch tokens against a reference patch set, as the
+                mean of the TOP_K most-novel patches, each patch via per-patch k-NN.
+    L2 (embed): embed_novelty scores a frame's pooled vector against a reference set, as
+                1 - mean of the KNN nearest cosines.
 """
 
 import cv2
@@ -20,13 +20,14 @@ CV_GRID_TILES = (8, 8)      # rows, columns
 
 
 def to_jpeg(frame: np.ndarray, quality: int = 88) -> bytes:
-    """A webcam frame -> encoded JPEG bytes for the embedding engine."""
+    """Encode a webcam frame to JPEG bytes for the embedding engine."""
     ok, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, quality])
     return encoded.tobytes() if ok else b""
 
 
 def as_vector(embedding: list[float] | None) -> np.ndarray | None:
-    """The engine's pooled embedding (a list)."""
+    """Shape a pooled embedding into a unit-norm (1, D) row for the scorers; None passes through.
+    The (1, D) shape (not (D,)) is what embed_novelty and the recognition bank consume."""
     if not embedding:
         return None
     vector = np.asarray(embedding, np.float32)
@@ -84,7 +85,7 @@ def patch_novelty(query_patches: np.ndarray, reference_patches: np.ndarray) -> f
 
 # L2: recognition novelty (lifelong recognition)
 def embed_novelty(query: np.ndarray, reference: np.ndarray) -> float:
-    """Novelty of a frame's pooled embedding (1, D) vs a reference set of normal vectors"""
+    """Novelty of a frame's pooled embedding (1, D) vs a reference set of normal vectors."""
 
     similarities = reference @ query[0]
     k = min(KNN, similarities.shape[0])

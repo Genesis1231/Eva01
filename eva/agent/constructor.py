@@ -20,40 +20,46 @@ class PromptConstructor:
         self.instructions: str = load_prompt("INSTRUCTIONS") # default instructions prompt
         self.people: dict[str, Any] | None = people
 
-    def build_system(
+    def build_system(self, timestamp: str) -> str:
+        """Build the stable system prompt: persona + instructions + current time.
+
+        Identity only. Volatile per-turn context (memory, people, mood) is built by build_context
+        and injected next to the current turn by the Cortex, not glued into identity here."""
+        return (
+            f"<PERSONA>{self.soul}</PERSONA>\n\n"
+            f"<INSTRUCTIONS>\n"
+            f"{self.instructions}\n"
+            f"</INSTRUCTIONS>\n\n"
+            f"<CURRENT_TIME>{timestamp}</CURRENT_TIME>\n\n"
+        )
+
+    def build_context(
         self,
-        timestamp: str,
         memory: str = "",
         present_people: set[str] = set(),
         mood_block: str = "",
     ) -> str:
-        """Build the system prompt string."""
+        """Build the volatile per-turn context: what's recalled/known + who's present + mood.
 
-        prompt = (
-            f"<PERSONA>{self.soul}</PERSONA>\n\n"
-            f"<INSTRUCTIONS>\n"
-            f"{self.instructions}\n"
-            f"</INSTRUCTIONS>"
-        )
-
+        Returned as a plain string for the Cortex to carry in a transient turn-side message (not the
+        system prompt): it changes every turn and should read as 'what's true right now'. Returns ''
+        when there's nothing, so the caller can skip the message entirely."""
         people_block = self._build_people_block(present_people)
-        has_memory = people_block or memory
 
-        if has_memory:
-            prompt += "\n\n<MEMORY>"
+        parts = []
+        if people_block or memory:
+            block = "<MEMORY>"
             if people_block:
-                prompt += f"\n{people_block}"
+                block += f"\n{people_block}"
             if memory:
-                prompt += f"\n{memory}"
-            prompt += "\n</MEMORY>"
+                block += f"\n{memory}"
+            block += "\n</MEMORY>"
+            parts.append(block)
 
         if mood_block:
-            prompt += f"\n\n{mood_block}"
+            parts.append(mood_block)
 
-        prompt += f"\n\n<CURRENT_TIME>{timestamp}</CURRENT_TIME>\n\n"
-
-        # logger.debug(f"Constructed system prompt:\n{prompt}")
-        return prompt
+        return "\n\n".join(parts)
 
     def _build_people_block(self, present_people: set[str] | None) -> str :
         """Build <PEOPLE> block from face IDs currently visible to EVA."""

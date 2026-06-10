@@ -10,6 +10,7 @@ from langchain.chat_models import init_chat_model
 from langchain_core.tools import BaseTool
 from langchain_core.messages import (
     SystemMessage,
+    HumanMessage,
     AIMessage,
     BaseMessage,
     trim_messages
@@ -23,7 +24,7 @@ class Cortex:
     """EVA's language cortex — wraps LLM + prompt into a single respond() call."""
 
     _TEMPERATURE = 0.8  # creative but not too random
-    _MAX_HISTORY_TOKENS = 8000  # rough limit for context window, leaving room for response
+    _MAX_HISTORY_TOKENS = 16000  # rough limit for context window, leaving room for response
 
     def __init__(
         self,
@@ -49,22 +50,28 @@ class Cortex:
     ) -> AIMessage:
         """Construct prompt, trim messages, invoke LLM, return response."""
 
-        # if sense is audio text, add to messages as HumanMessage;
-        # if it's text, add to system prompt as OBSERVATION
         timestamp = datetime.now().strftime("%A, %B %d, %Y at %-I%p")
-        system = constructor.build_system(
-            timestamp=timestamp,
+        system = constructor.build_system(timestamp=timestamp)
+
+        # Volatile per-turn context (memory/people/mood) rides a transient HumanMessage next to the
+        # current turn, NOT the system prompt: it changes every turn and is never checkpointed (only
+        # the model's response is), so it can't accumulate or replay stale recall.
+        context = constructor.build_context(
             memory=memory,
             present_people=present_people,
             mood_block=mood,
         )
 
         # trim to fit context window, keeping recent messages
-        messages = trim_messages(messages, max_tokens=self._MAX_HISTORY_TOKENS, token_counter='approximate')  
-        
-        # Only add the kickoff prompt on the initial pass, not on ReAct continuations
-        # (where the last message is a ToolMessage from a prior tool call)
+        messages = trim_messages(
+            messages, 
+            max_tokens=self._MAX_HISTORY_TOKENS, 
+            token_counter='approximate',
+            start_on="human")
+
         complete_prompt = [SystemMessage(content=system)] + messages
+        if context:
+            complete_prompt.append(HumanMessage(content=context))
                          
         # logger.debug(f"Cortex received messages:\n{complete_prompt}\n")
 

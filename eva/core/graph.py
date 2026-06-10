@@ -60,6 +60,7 @@ class Brain:
         self.thread_id = self._new_thread_id()
         self._config = self._get_config()
         self._terminal_tools = {t.name for t in self.tools if (t.metadata or {}).get("terminal")}
+        self._checkpointer = checkpointer
         self._graph = self._build(checkpointer)
 
     def _new_thread_id(self) -> str:
@@ -182,17 +183,30 @@ class Brain:
             self._processing = False
 
     async def shutdown(self):
-        """Graceful shutdown — flush memory, close resources."""
-        
+        """Graceful shutdown — flush memory, then clear this session's checkpoints.
+
+        The checkpointer is a write-ahead log: once messages are distilled into
+        long-term memory the raw rows have no further use, and without the delete
+        every session's checkpoints accumulate in eva_graph.db forever. Kept when
+        the flush fails — they're the only copy of the undistilled session then.
+        """
         state = await self._graph.aget_state(config=self._config)
-        
+
         if not state or not state.values:
             logger.debug("Brain shutdown: no state found, skipping memory flush.")
             return
-        
+
         messages = state.values.get("messages", [])
         if messages:
             try:
-                await self.memory.flush(messages, session_id=self.thread_id)
+                await self.memory.flush(messages)
             except Exception as e:
                 logger.error(f"EVA: failed to flush memory — {e}")
+                return
+
+        if self._checkpointer is not None:
+            try:
+                await self._checkpointer.adelete_thread(self.thread_id)
+                logger.debug(f"Brain: cleared checkpoints for thread {self.thread_id}")
+            except Exception as e:
+                logger.warning(f"Brain: failed to clear session checkpoints — {e}")

@@ -1,26 +1,23 @@
-"""Speaker→listener appraisal — two reaction tables + SOUL-weighted redistribution.
+"""Speaker-to-listener appraisal: two reaction tables plus SOUL-weighted redistribution.
 
-Variant C from docs/MoodAppraisalExperiment.md, refined into a two-table
-split. GoEmotions classifies what emotion a *speaker* expressed; a
-listener with their own identity rarely feels the same emotion back.
-For each source emotion the speaker expressed, the tables list the
-candidate emotions the listener might feel; :func:`_appraise` then
-redistributes the source mass across those candidates weighted by the
-listener's SOUL profile.
+Variant C from docs/MoodAppraisalExperiment.md, split into two tables. GoEmotions
+classifies what a speaker expressed; a listener with their own identity rarely feels the
+same emotion back. For each emotion the speaker expressed, the tables list the candidates
+the listener might feel, and _appraise spreads the source mass across those candidates
+weighted by the listener's SOUL profile.
 
-Limitation: the tables are static and hand-crafted, so they can't capture the full nuance. 
-But they can still provide a useful baseline for signal.
+The tables are static and hand-crafted, so they miss nuance, but they give a useful
+baseline signal.
 """
 
 import re
 from .labels import GO_EMOTIONS_LABELS, LABEL_INDEX
 
 
-# Lightweight text heuristic. Speech acts and second-person pronouns mean
-# the speaker is acting on Eva; "I/we/me/us" means the speaker is expressing
-# about self (or a group/3rd party); neither means pure contagion (caller
-# skips appraisal). Crude — replace with structured speaker metadata from
-# AudioSense when available.
+# Lightweight text heuristic. Speech acts and second-person pronouns mean the speaker is
+# acting on Eva; "I/we/me/us" means they're expressing about themselves (or a group/3rd
+# party); neither means pure contagion (the caller skips appraisal). Crude, so replace it
+# with structured speaker metadata from AudioSense when that exists.
 _YOU_RE = re.compile(r"\byou(?:'?(?:re|ve|ll|d|rs))?\b|\byour\b", re.I)
 _SELF_RE = re.compile(
     r"\bI(?:'?(?:m|ve|ll|d))?\b|\b(?:we|us|our|ours|me|my|mine)\b", re.I,
@@ -58,7 +55,7 @@ def strip_sense_tag(text: str) -> str:
 def detect_direction(text: str) -> str:
     """Classify 'directed', 'empathic', or 'contagion' from text cues.
 
-    Expects the sense tag already stripped (see :func:`strip_sense_tag`).
+    Expects the sense tag already stripped (see strip_sense_tag).
     """
     text = _SECOND_PERSON_DISCOURSE_RE.sub("", text)
     if (
@@ -80,10 +77,9 @@ def _appraise(
 ) -> list[float]:
     """Redistribute each source emotion across its candidate cluster.
 
-    For source emotion at index ``i`` with mass ``raw[i]``, distribute
-    that mass across ``table[label_i]`` candidates weighted by ``soul``.
-    If SOUL has no signal across the cluster, the source emotion does
-    not contribute to the appraised mood.
+    For the source emotion at index i with mass raw[i], spread that mass across
+    table[label_i]'s candidates weighted by soul. If SOUL has no signal across the
+    cluster, that source emotion doesn't contribute to the appraised mood.
     """
     out = [0.0] * len(raw)
     for i, p in enumerate(raw):

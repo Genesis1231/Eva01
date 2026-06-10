@@ -44,7 +44,6 @@ def _screenshot(url: str) -> tuple[bytes, str] | None:
             size=_VIEWPORT,
             custom_flags=[
                 "--headless=new",
-                "--no-sandbox",
                 "--disable-dev-shm-usage",
                 "--disable-gpu",
                 "--hide-scrollbars",

@@ -1,8 +1,8 @@
 """Route-threshold calibration for L2 visual recognition.
 
-The recognition bank answers "how far is this frame from normal?" This module owns the
-route threshold for: an initial held-out normal null, then a rolling online
-calibration stream so the threshold can follow changes in lighting, room, or camera view.
+The recognition bank answers "how far is this frame from normal?" This module owns the route
+threshold: first from an initial held-out normal null, then from a rolling online calibration stream
+so the threshold can follow changes in lighting, room, or camera view.
 """
 
 from collections import deque
@@ -30,7 +30,7 @@ class RouteCalibrator:
             observed = []
 
         self._scores = deque(observed[-self.WINDOW:], maxlen=self.WINDOW)
-        self._refresh()    # no-op below MIN_SCORES — keeps the passed threshold
+        self._refresh()    # no-op below MIN_SCORES, keeps the passed threshold
 
     @classmethod
     def initialize(
@@ -62,9 +62,9 @@ class RouteCalibrator:
     def observe(self, score: float) -> None:
         """Recalibrate from a presumed-normal pre-gate observation.
 
-        The caller should feed this before the `<= threshold` admit gate. Feeding only
-        accepted scores makes the sample left-censored by its own threshold and ratchets
-        theta downward over time.
+        The caller should feed this before the "<= threshold" admit gate. Feeding only accepted
+        scores would make the sample left-censored by its own threshold and ratchet theta downward
+        over time.
         """
 
         if np.isfinite(score):

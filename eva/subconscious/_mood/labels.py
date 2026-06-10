@@ -1,8 +1,7 @@
-"""GoEmotions label vocabulary — index alignment with model output.
+"""GoEmotions label vocabulary, in the model's output order.
 
-The i-th probability emitted by SamLowe/roberta-base-go_emotions-onnx
-corresponds to the i-th label here, so this list is also the canonical
-index → name mapping for the mood vector.
+The i-th probability from SamLowe/roberta-base-go_emotions-onnx is the i-th label here,
+so this list doubles as the index->name mapping for the mood vector.
 """
 
 GO_EMOTIONS_LABELS: list[str] = [
@@ -19,9 +18,9 @@ LABEL_INDEX: dict[str, int] = {
 }
 
 
-# Speaker expressing about self / 3rd party — Eva is the bystander.
-# Positive sources → contagion + warmth toward speaker;
-# negative sources → empathic concern, not personal distress.
+# Speaker is expressing about themselves or a third party, so Eva is a bystander.
+# Positive sources give contagion plus warmth toward the speaker; negative sources
+# give empathic concern, not personal distress.
 EMPATHIC_REACTIONS: dict[str, set[str]] = {
     "joy":            {"joy", "amusement", "excitement", "love"},
     "amusement":      {"amusement", "joy", "curiosity"},
@@ -53,11 +52,11 @@ EMPATHIC_REACTIONS: dict[str, set[str]] = {
 }
 
 
-# Speaker is acting on Eva — Eva is the target.
-# Praise → pride/joy bouquet (Algoe 2008); criticism → fear/remorse
-# with reactance candidates (Van Kleef 2009 EASI). DIRECTED gratitude
-# includes embarrassment reflex (Brown & Levinson
-# politeness theory — face-saving response to effusive thanks).
+# Speaker is acting on Eva, so Eva is the target.
+# Praise gives a pride/joy bouquet (Algoe 2008); criticism gives fear/remorse with
+# reactance candidates (Van Kleef 2009 EASI). Directed gratitude includes an
+# embarrassment reflex (Brown & Levinson politeness theory: a face-saving response to
+# effusive thanks).
 DIRECTED_REACTIONS: dict[str, set[str]] = {
     "admiration":     {"pride", "joy", "love", "gratitude", "embarrassment"},
     "approval":       {"pride", "joy", "gratitude", "love"},

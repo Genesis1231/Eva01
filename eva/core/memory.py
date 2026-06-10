@@ -14,21 +14,27 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from config import logger
 from eva.agent.schema import PeopleReflection
-from eva.core.journal import JournalDB
+from eva.core.moment import MomentDB
 from eva.core.people import PeopleDB
+from eva.database.embeddings import EmbeddingEngine
 from eva.utils.prompt import load_prompt
+
+_REFLECTION_IMPORTANCE = 0.6   # activation seed for a session reflection (mirrors Experience.IMPORTANCE)
 
 
 class MemoryDB:
-    """EVA's long-term memory — orchestration layer over JournalDB + PeopleDB."""
+    """EVA's long-term memory — orchestration layer over MomentDB + PeopleDB.
+    A session reflection is stored as a moment with no senses (kind='reflection')."""
 
     def __init__(
         self,
         utility_model: str,
         people_db: PeopleDB,
-        journal_db: JournalDB,
+        moment_db: MomentDB,
+        embedder: EmbeddingEngine,
     ):
-        self._journal = journal_db
+        self._moments = moment_db
+        self._embedder = embedder
         self._people = people_db
         self._journal_prompt = load_prompt("journal")
         self._relationships_prompt = load_prompt("relationships")
@@ -145,8 +151,8 @@ class MemoryDB:
         """
         distilled = self.distill(messages)
 
-        # Get recent journal entries, limit to 5
-        entries = await self._journal.get_recent(limit)
+        # Get today's reflections from the unified moment store, limit to 5
+        entries = await self._moments.recent(limit)
         journal_summary = "\n\n".join(entries) if entries else ""
 
         return distilled, journal_summary
@@ -165,10 +171,10 @@ class MemoryDB:
 
     # ── Flush ────────────────────────────────────────────────
 
-    async def flush(self, messages: list, session_id: str) -> None:
+    async def flush(self, messages: list) -> None:
         """
-        Summarize a full session into a journal entry via the utility LLM.
-        Called on shutdown/recovery to save the session to the journal.
+        Summarize a full session into a reflection via the utility LLM and store it as a moment
+        (kind='reflection'). Called on shutdown/recovery to save the session.
         """
         if not messages:
             logger.debug("MemoryDB: nothing to flush.")
@@ -196,13 +202,18 @@ class MemoryDB:
             return
         
         try:
-            # Journal the session via utility LLM
+            # Reflect on the session via utility LLM
             journal, _ = await asyncio.gather(
                 self._reflect_messages(conversation),
                 self._reflect_people(conversation)
             )
 
-            await self._journal.add(journal, session_id)
+            # Store as a reflection-moment; its note_key makes it conceptually recallable later.
+            note_key = await self._embedder.embed_one(journal)
+            await self._moments.memorize(
+                note=journal, img_key=None, txt_key=None, importance=_REFLECTION_IMPORTANCE,
+                note_key=note_key, kind="reflection",
+            )
             logger.debug(f"MemoryDB: journaled session: {journal}.")
             return
         except Exception as e:
