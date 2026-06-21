@@ -11,6 +11,9 @@ VoiceActor:
 """
 
 import asyncio
+import time
+from typing import Callable, Optional
+
 from config import logger
 
 from .speaker import Speaker
@@ -25,8 +28,19 @@ class VoiceActor(BaseAction):
     can preempt instead of waiting.
     """
 
-    def __init__(self, speaker: Speaker):
+    # Politeness grace: how long the floor must stay clear before EVA starts talking.
+    # Deliberately short — the mic's VAD hangover (MIN_SILENCE, 0.8s) already keeps the
+    # floor held through breath pauses, so the felt turn gap is the sum (~1s). Tune the
+    # two together, not separately.
+    _GRACE = 0.2
+
+    def __init__(
+        self,
+        speaker: Speaker,
+        is_user_speaking: Optional[Callable[[], bool]] = None,
+    ):
         self.speaker = speaker
+        self.is_user_speaking = is_user_speaking   # the floor signal; None = no gating
         self._queue: asyncio.Queue[ActionEvent] = asyncio.Queue()
         self._worker_task: asyncio.Task | None = None
         self._current_speech: asyncio.Task | None = None
@@ -35,6 +49,17 @@ class VoiceActor(BaseAction):
     @property
     def is_speaking(self) -> bool:
         return self._current_speech is not None
+
+    @property
+    def is_playing(self) -> bool:
+        """True while her voice is physically in the air (synthesis excluded).
+        The mic's echo handling keys on this — synthesis time is clean air."""
+        return self.speaker.is_playing
+
+    @property
+    def playback_level(self) -> float:
+        """Instantaneous output RMS — the mic compares what it hears against this."""
+        return self.speaker.playback_level
 
     def register(self, buffer: ActionBuffer) -> None:
         buffer.on("speak", self._enqueue)
@@ -72,6 +97,23 @@ class VoiceActor(BaseAction):
         if self._loop and self._loop.is_running():
             asyncio.run_coroutine_threadsafe(self.interrupt(), self._loop)
 
+    async def _await_floor(self) -> None:
+        """Politeness: hold the next utterance until the user's floor has been clear
+        for _GRACE. The user always wins the floor — EVA waits, she never talks over."""
+        if self.is_user_speaking is None:
+            return
+        clear_since: float | None = None
+        while True:
+            if self.is_user_speaking():
+                clear_since = None
+            else:
+                now = time.monotonic()
+                if clear_since is None:
+                    clear_since = now
+                elif now - clear_since >= self._GRACE:
+                    return
+            await asyncio.sleep(0.1)
+
     async def _worker(self) -> None:
         """Consume the speech queue serially. Waits for each thread to finish
         before pulling the next event, so interrupted speech can't overlap
@@ -82,9 +124,31 @@ class VoiceActor(BaseAction):
                 continue
 
             language = (event.metadata or {}).get("language", "en")
-            self._current_speech = asyncio.create_task(
-                asyncio.to_thread(self.speaker.speak, event.content, language)
-            )
+
+            # Synthesize FIRST — it's silent, so it conflicts with no one — and
+            # buffer the audio. Only playback is gated on the floor: when the
+            # user finishes, she answers instantly instead of paying synthesis
+            # latency on top of the wait. A barge-in meanwhile is still honored:
+            # the stop flag it sets makes play() skip the buffered utterance.
+            try:
+                prepared = await asyncio.to_thread(
+                    self.speaker.synthesize, event.content, language
+                )
+            except Exception as e:
+                logger.error(f"VoiceActor: synthesis error — {e}")
+                prepared = None
+
+            await self._await_floor()
+
+            if prepared is not None:
+                self._current_speech = asyncio.create_task(
+                    asyncio.to_thread(self.speaker.play, prepared, event.content)
+                )
+            else:
+                # Backend can't split (Edge/ElevenLabs): synthesize+play in one call.
+                self._current_speech = asyncio.create_task(
+                    asyncio.to_thread(self.speaker.speak, event.content, language)
+                )
             try:
                 await self._current_speech
             except Exception as e:

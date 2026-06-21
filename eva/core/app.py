@@ -129,10 +129,15 @@ async def assemble(
         transcriber,
         speaker_identifier=speaker_identifier,
         on_interrupt=voice_actor.interrupt_from_thread,
-        is_speaking=lambda: voice_actor.is_speaking,
+        is_playing=lambda: voice_actor.is_playing,
+        playback_level=lambda: voice_actor.playback_level,
         on_transcript=speech_window.add,
     )
     audio_sense.start(sense_buffer)
+
+    # The floor signal flows back senses → actions: EVA waits to speak while the
+    # user is speaking (the mirror of is_playing flowing actions → senses above).
+    voice_actor.is_user_speaking = lambda: audio_sense.user_speaking
 
     # Brain — owns tools + workflow, Cortex owns LLM + prompt
     brain = Brain(

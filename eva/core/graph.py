@@ -8,7 +8,6 @@ Pure workflow topology. The Cortex owns the LLM and prompt logic.
 """
 
 import asyncio
-from datetime import datetime
 from typing import List, Dict, Annotated, TypedDict, Set
 
 from langchain_core.runnables import RunnableConfig
@@ -30,7 +29,7 @@ from eva.subconscious.mood import MoodScorer, _update_mood
 from eva.tools import load_tools, handle_tool_error
 from eva.subconscious.mood import render_mood
 from eva.utils.feed import feed_post
-from eva.utils.format import image_uri
+from eva.utils.format import now_iso
 
 class EvaState(TypedDict):
     messages: Annotated[List[BaseMessage], add_messages]
@@ -64,7 +63,7 @@ class Brain:
 
     def _new_thread_id(self) -> str:
         """Generate a new thread ID."""
-        return f"eva-{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+        return f"eva-{now_iso()}"
 
     def _get_config(self) -> RunnableConfig:
         """Get the current config for graph execution."""

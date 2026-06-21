@@ -16,9 +16,10 @@ curve is a later slice.
 import math
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 
 from config import logger
+from eva.utils.format import now_iso
 from eva.database.db import SQLiteHandler
 from eva.database.vector_index import VectorIndex
 
@@ -77,9 +78,9 @@ class MomentDB:
         related_id: str | None = None,
     ) -> str:
         """Store a new moment."""
-        
+
         moment_id = uuid.uuid4().hex[:12]
-        now = datetime.now(timezone.utc).isoformat()
+        now = now_iso()
         try:
             await self._db.execute(
                 """INSERT INTO moments
@@ -142,7 +143,7 @@ class MomentDB:
             """UPDATE moments
             SET activation = MIN(1.0, activation + (1.0 - activation) * ?), last_recalled_at = ?
             WHERE id = ?""",
-            (_REINFORCE_GAIN, datetime.now(timezone.utc).isoformat(), moment_id),
+            (_REINFORCE_GAIN, now_iso(), moment_id),
         )
 
 
@@ -150,9 +151,8 @@ class MomentDB:
         """Today's reflections, newest-N, returned oldest-first and timestamp-formatted — the
         journal context injected into her prompt each session. Read-only: never reinforces (this
         runs every boot). This is the diary view of the unified store (the old JournalDB's role)."""
-        today_start = datetime.now(timezone.utc).replace(
-            hour=0, minute=0, second=0, microsecond=0
-        ).isoformat()
+
+        today_start = now_iso(reset=True)
         rows = list(await self._db.fetchall(
             "SELECT note, created_at FROM moments WHERE kind = 'reflection' AND created_at >= ? "
             "ORDER BY created_at DESC LIMIT ?",

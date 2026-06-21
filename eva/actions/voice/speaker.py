@@ -70,6 +70,20 @@ class Speaker:
         logger.debug(f"Speaker: {self._model_name} is ready.")
         return self.model
 
+    @property
+    def is_playing(self) -> bool:
+        """True while audio is physically playing — False during synthesis.
+        ElevenLabs streams outside our AudioPlayer, so it reads False there
+        (its barge-in is already known-broken)."""
+        player = getattr(self.model, "audio_player", None)
+        return bool(player is not None and player.playing)
+
+    @property
+    def playback_level(self) -> float:
+        """Instantaneous output RMS — the mic's echo reference. 0.0 when silent."""
+        player = getattr(self.model, "audio_player", None)
+        return player.level if player is not None else 0.0
+
     def stop_speaking(self) -> None:
         """ Stop the speaker model. Thread-safe. """
         if self.model is None or not hasattr(self.model, 'stop_playback'):
@@ -78,12 +92,26 @@ class Speaker:
 
         self.model.stop_playback()
         
+    def synthesize(self, answer: str, language: str = "en"):
+        """Prepare speech without playing, so the floor wait costs no extra latency.
+        Returns an opaque handle for play(), or None when the model can't split
+        (Edge/ElevenLabs) — the caller falls back to speak()."""
+        if self.model is None or not hasattr(self.model, 'synthesize'):
+            return None
+        return self.model.synthesize(answer, language)
+
+    def play(self, prepared, answer: str = "") -> None:
+        """Play speech prepared by synthesize(). Blocking — run via to_thread."""
+        if answer:
+            print(f"\n({datetime.now().strftime('%H:%M:%S')}) EVA: {answer}")
+        self.model.play(prepared)
+
     def speak(self, answer: str, language: str = "en"):
         """ Speak the given text. Blocking — run via to_thread. """
 
         if self.model is None or not hasattr(self.model, 'eva_speak'):
             raise RuntimeError("Speaker: TTS model not initialized or does not support speaking.")
-        
+
         try:
             print(f"\n({datetime.now().strftime('%H:%M:%S')}) EVA: {answer}")
             self.model.eva_speak(answer, language)

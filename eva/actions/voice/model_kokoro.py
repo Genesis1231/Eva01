@@ -63,23 +63,35 @@ class KokoroSpeaker:
     def _get_language(self, language: Optional[str]) -> str:
         return _LANG_MAP.get(language or "en", "en-us") if language else "en-us"
 
-    def eva_speak(self, text: str, language: Optional[str] = None) -> None:
-        """Speak the given text using Kokoro TTS. Blocking — run via to_thread."""
-        
+    def synthesize(self, text: str, language: Optional[str] = None):
+        """Render text to PCM without playing — speech is prepared ahead, then played
+        when the floor is free. Returns (samples, sample_rate) or None on failure."""
+
         if not self._model:
             logger.error("KokoroSpeaker: TTS model not initialized.")
-            return
-        
+            return None
+
         try:
-            samples, sample_rate = self._model.create(
+            return self._model.create(
                 text=text,
                 voice=self.voice,
                 lang=self._get_language(language),
             )
-            self.audio_player.play_pcm(samples, sample_rate)
-
         except Exception as e:
-            logger.error(f"Error during Kokoro TTS: {e}")
+            logger.error(f"Error during Kokoro TTS synthesis: {e}")
+            return None
+
+    def play(self, prepared) -> None:
+        """Play PCM prepared by synthesize(). Blocking — run via to_thread."""
+        samples, sample_rate = prepared
+        self.audio_player.play_pcm(samples, sample_rate)
+
+    def eva_speak(self, text: str, language: Optional[str] = None) -> None:
+        """Synthesize and play in one call. Blocking — run via to_thread."""
+
+        prepared = self.synthesize(text, language)
+        if prepared is not None:
+            self.play(prepared)
 
     async def generate_audio(
         self, text: str, 

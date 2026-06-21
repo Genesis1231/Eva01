@@ -13,7 +13,21 @@ class AudioPlayer:
     def __init__(self):
         self.player: mpv.MPV | None = None
         self._stop_event: bool = False
+        self._playing: bool = False
+        self._level: float = 0.0
         self._current_stream: sd.OutputStream | None = None
+
+    @property
+    def playing(self) -> bool:
+        """True while audio is physically leaving the speakers (synthesis excluded).
+        The open mic keys its echo handling on this, not on "committed to speak"."""
+        return self._playing or self.player is not None
+
+    @property
+    def level(self) -> float:
+        """RMS of the PCM chunk being written right now — the mic's echo reference.
+        Zero when idle or on the mpv path (no PCM visibility)."""
+        return self._level
 
     def stop_playback(self) -> None:
         """Stop all active audio playback immediately.
@@ -54,6 +68,7 @@ class AudioPlayer:
         chunk_size = 2048  # ~85ms at 24kHz
 
         try:
+            self._playing = True
             # Use OutputStream for better control
             with sd.OutputStream(samplerate=sample_rate, channels=1, dtype='float32') as stream:
                 self._current_stream = stream
@@ -67,11 +82,14 @@ class AudioPlayer:
                     end_frame = min(i + chunk_size, total_frames)
                     chunk = samples[i:end_frame]
 
+                    self._level = float(np.sqrt(np.mean(chunk ** 2)))
                     stream.write(chunk)
 
         except Exception as e:
             logger.warning(f"AudioPlayer: error while playing PCM audio: {e}")
         finally:
+            self._playing = False
+            self._level = 0.0
             self._stop_event = False
             self._current_stream = None
          
