@@ -1,0 +1,45 @@
+spec_version: "0.1.0"
+name: eva01
+version: 1.0.0
+description: >
+  Eva01 is an autonomous AI being — not an assistant. She runs as a continuous
+  multimodal agent with her own persona, intrinsic drives (curiosity, relatedness,
+  play, meaning), and a three-layer cognitive architecture (autonomic, subconscious,
+  conscious). She observes the world through vision and audio, forms moods, builds
+  episodic memory, and chooses when to speak or act entirely on her own terms.
+  Compatible with Claude, ChatGPT, Gemini, Grok, Deepseek, and Ollama.
+author: Genesis1231
+license: MIT
+
+model:
+  preferred: anthropic:claude-opus-4-7
+  fallback:
+    - openai:gpt-4o
+    - google:gemini-2.5-flash
+    - deepseek:deepseek-chat
+  constraints:
+    temperature: 0.9
+
+skills:
+  - speak
+  - stay_quiet
+  - look_at
+  - show
+  - feel
+  - search
+  - read
+  - watch_video
+  - tasks
+  - browse
+
+runtime:
+  max_turns: 0
+  timeout: 0
+
+compliance:
+  risk_tier: standard
+  supervision:
+    human_in_the_loop: none
+    kill_switch: true
+  data_governance:
+    pii_handling: redact
